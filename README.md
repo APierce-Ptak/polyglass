@@ -1,12 +1,20 @@
-# Polyglass
+<p align="center">
+  <img src="docs/logo.png" alt="Polyglass logo: a parrot perched on a pane of glass" width="160">
+</p>
 
-*See any language, in place.*
+<h1 align="center">Polyglass</h1>
 
-**Website:** https://apierce-ptak.github.io/polyglass/ · **[Download for Windows](https://github.com/APierce-Ptak/polyglass/archive/refs/heads/main.zip)**
+<p align="center"><em>See any language, in place.</em></p>
 
-A transparent, click-through overlay for Windows that reads foreign text on your screen and draws the English translation **in the same spot**, right over the original. It works on games, videos, apps, and web pages.
+<p align="center">
+  <a href="https://apierce-ptak.github.io/polyglass/"><strong>Website</strong></a> ·
+  <a href="https://github.com/APierce-Ptak/polyglass/archive/refs/heads/main.zip"><strong>Download for Windows</strong></a>
+</p>
 
-- Translates Chinese, Japanese, Korean, Russian, Arabic, and Latin-script languages (Spanish, French, German, and others) into English.
+A transparent, click-through overlay for Windows that reads the text on your screen and draws the translation, in the language you choose, **in the same spot**, right over the original. It works on games, videos, apps, and web pages.
+
+- **Translates into the language you choose,** not just English: pick your language in setup and Polyglass translates the screen into it. Ctrl+Alt+D switches the output between English and your language.
+- Supports Chinese, Japanese, Korean, Russian, Arabic, and Latin-script languages (Spanish, French, German, and others). Between two non-English languages (for example Japanese → Spanish), it translates through English.
 - Fully offline: OCR and translation both run on your PC.
 - Live mode re-translates only when the text on screen actually changes, so it doesn't waste CPU.
 - Always-on status bar at the top of the screen, with a loading spinner while it works.
@@ -16,20 +24,23 @@ A transparent, click-through overlay for Windows that reads foreign text on your
 
 1. Download this repo (green **Code** button, then **Download ZIP**) and unzip it.
 2. Double-click **`Install.bat`**.
-3. Follow the setup wizard. It creates a private Python environment, installs the packages, adds Windows OCR language packs for the languages you pick, downloads the offline translation models, and makes a desktop shortcut.
+3. Follow the setup wizard. Pick the languages you'll see on screen and, optionally, the language you want translations in (besides English). The wizard creates a private Python environment, installs the packages, adds Windows OCR language packs, downloads the offline translation models, and makes a desktop shortcut.
 
 Requirements: Windows 10 or 11, an internet connection for setup, and about 3 GB of free disk space. If Python 3.10-3.12 is missing, `Install.bat` installs it with winget or sends you to the download page.
 
 ## Use
 
-Start **Polyglass** from the desktop shortcut (or `Run.bat`), click the window with foreign text, and press:
+Start **Polyglass** from the desktop shortcut (or `Run.bat`), click the window with the text, and press:
 
 | Hotkey | Action |
 |---|---|
 | Ctrl+Alt+T | Translate the screen once |
 | Ctrl+Alt+L | Turn live mode on or off |
+| Ctrl+Alt+D | Switch the output language between English and your chosen language |
 | Ctrl+Alt+C | Clear the overlay |
 | Ctrl+Alt+Q | Quit |
+
+The status bar shows the current direction (for example `→ EN` or `→ JA`). Text that is already in the output language is left alone.
 
 The first translation after each launch takes several seconds while the models load. After that it takes 1-3 seconds.
 
@@ -39,7 +50,7 @@ Games should run in **windowed or borderless** mode. Exclusive fullscreen draws 
 
 1. `mss` captures the screen.
 2. [RapidOCR](https://github.com/RapidAI/RapidOCR) reads Chinese and Japanese text, including stylised game fonts. Windows' built-in OCR handles other languages, with automatic language detection.
-3. [Argos Translate](https://github.com/argosopentech/argos-translate) translates each line to English offline.
+3. [Argos Translate](https://github.com/argosopentech/argos-translate) translates each line offline into the current output language. When there's no direct model, it goes through English (for example Japanese → English → Spanish).
 4. A transparent, click-through Tk window paints each translation over its source line, with the background colour sampled from the screenshot. The window is hidden from screen capture so it never reads its own output.
 
 ## Troubleshooting
@@ -48,6 +59,7 @@ Run `Debug.bat` to see a console with what the app is doing. It prints the insta
 
 - **Says only `en-US` is installed:** re-run `Install.bat` and tick the language, then accept the Windows permission prompt.
 - **Nothing appears over a game:** switch the game to windowed or borderless.
+- **Ctrl+Alt+D says no other language is set:** re-run `Install.bat` and pick a language under "Also translate into". You can also add `"other_language": "es"` (or another code) to `polyglass.json` in the app folder.
 - **Wrong or odd translations:** offline models are good but not perfect. Text is translated line by line.
 
 ## Manual install

@@ -6,6 +6,7 @@ offline translation models, desktop shortcut) -> done / launch.
 
 Start it by double-clicking Install.bat (it finds a suitable Python first).
 """
+import json
 import os
 import queue
 import subprocess
@@ -20,6 +21,8 @@ VENV_DIR = os.path.join(APP_DIR, ".venv")
 VPY = os.path.join(VENV_DIR, "Scripts", "python.exe")
 VPYW = os.path.join(VENV_DIR, "Scripts", "pythonw.exe")
 APP = os.path.join(APP_DIR, "polyglass.py")
+CONFIG = os.path.join(APP_DIR, "polyglass.json")
+ICON = os.path.join(APP_DIR, "polyglass.ico")
 NO_WINDOW = 0x08000000
 
 # (label, Windows OCR tag, Argos code)
@@ -33,6 +36,8 @@ LANGS = [
 ]
 LATIN = [("Spanish", "es"), ("French", "fr"), ("German", "de"),
          ("Portuguese", "pt"), ("Italian", "it")]
+# Choices for the second output language (label, Argos code).
+REVERSE = [("None", "")] + [(l, c) for l, _, c in LANGS] + LATIN
 
 BG, FG, ACCENT, MUTED = "#15171c", "#f2f3f5", "#4fc3f7", "#8b93a7"
 
@@ -41,12 +46,17 @@ class Wizard(tk.Tk):
     def __init__(self):
         super().__init__()
         self.title("Polyglass Setup")
-        self.geometry("680x540")
+        if os.path.exists(ICON):
+            self.iconbitmap(ICON)
+        self.geometry("680x600")
         self.resizable(False, False)
         self.configure(bg=BG)
         self.q = queue.Queue()
         self.lang_vars = {c: tk.BooleanVar(value=(c == "zh")) for _, _, c in LANGS}
         self.latin_vars = {c: tk.BooleanVar(value=False) for _, c in LATIN}
+        self.config_data = self.load_config()
+        prev = self.config_data.get("other_language", "")
+        self.reverse = tk.StringVar(value=next((l for l, c in REVERSE if c == prev), "None"))
         self.shortcut = tk.BooleanVar(value=True)
         self.launch = tk.BooleanVar(value=True)
         self.ok = True
@@ -121,7 +131,7 @@ class Wizard(tk.Tk):
 
     def page_langs(self):
         ttk.Label(self.body, text="Which languages?", style="H.TLabel").pack(anchor="w")
-        ttk.Label(self.body, style="M.TLabel", text="Pick the languages you want translated into English. You can rerun this wizard to add more.").pack(anchor="w", pady=(2, 14))
+        ttk.Label(self.body, style="M.TLabel", wraplength=620, text="Pick the languages you'll see on screen, and optionally the language you want translations in (besides English). You can rerun this wizard to change them.").pack(anchor="w", pady=(2, 14))
         grid = ttk.Frame(self.body)
         grid.pack(anchor="w")
         for i, (label, _tag, code) in enumerate(LANGS):
@@ -133,7 +143,13 @@ class Wizard(tk.Tk):
         for i, (label, code) in enumerate(LATIN):
             ttk.Checkbutton(g2, text=label, variable=self.latin_vars[code]).grid(
                 row=i // 3, column=i % 3, sticky="w", padx=(0, 30), pady=3)
-        ttk.Separator(self.body).pack(fill="x", pady=16)
+        rev = ttk.Frame(self.body)
+        rev.pack(anchor="w", pady=(16, 0))
+        ttk.Label(rev, text="Also translate into:").pack(side="left")
+        ttk.Combobox(rev, textvariable=self.reverse, state="readonly", width=22,
+                     values=[l for l, _ in REVERSE]).pack(side="left", padx=(10, 0))
+        ttk.Label(self.body, style="M.TLabel", text="Switch between English and this language any time with Ctrl+Alt+D.").pack(anchor="w", pady=(4, 0))
+        ttk.Separator(self.body).pack(fill="x", pady=14)
         ttk.Checkbutton(self.body, text="Create a desktop shortcut", variable=self.shortcut).pack(anchor="w", pady=2)
         ttk.Checkbutton(self.body, text="Start Polyglass when setup finishes", variable=self.launch).pack(anchor="w", pady=2)
         ttk.Label(self.body, style="M.TLabel", wraplength=620, text=(
@@ -160,9 +176,10 @@ class Wizard(tk.Tk):
             "Polyglass is ready.\n\n"
             "  Ctrl+Alt+T   translate the screen once\n"
             "  Ctrl+Alt+L   turn live mode on or off\n"
+            "  Ctrl+Alt+D   switch the output language (English / your language)\n"
             "  Ctrl+Alt+C   clear the overlay\n"
             "  Ctrl+Alt+Q   quit\n\n"
-            "Open the app, click the window with foreign text, then press Ctrl+Alt+T."
+            "Open the app, click the window with the text, then press Ctrl+Alt+T."
             if good else
             "Something went wrong. Scroll the log on the previous page or check\n"
             "setup_wizard.log in the app folder, then run Install.bat again.")
@@ -172,6 +189,22 @@ class Wizard(tk.Tk):
         self.next_btn.config(text="Finish")
 
     # ---------------------------------------------------------------- worker
+    @staticmethod
+    def load_config():
+        try:
+            with open(CONFIG, encoding="utf-8") as f:
+                return json.load(f)
+        except (OSError, ValueError):
+            return {}
+
+    def save_config(self, other):
+        cfg = self.config_data
+        cfg["other_language"] = other
+        if cfg.get("translate_to") not in ("en", other):
+            cfg["translate_to"] = "en"
+        with open(CONFIG, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+
     def say(self, msg):
         self.q.put(("log", msg))
 
@@ -224,6 +257,9 @@ class Wizard(tk.Tk):
     def _install(self):
         langs = [(l, t, c) for l, t, c in LANGS if self.lang_vars[c].get()]
         argos = [c for _, _, c in langs] + [c for _, c in LATIN if self.latin_vars[c].get()]
+        other = dict(REVERSE).get(self.reverse.get(), "")
+        pairs = [(c, "en") for c in argos] + ([("en", other)] if other else [])
+        self.save_config(other)
 
         self.step("Creating a private Python environment", 3)
         if not os.path.exists(VPY):
@@ -252,15 +288,14 @@ class Wizard(tk.Tk):
                   "print('Windows OCR languages:', [l.language_tag for l in OcrEngine.available_recognizer_languages])"])
 
         self.step("Downloading offline translation models", 70)
-        if argos:
+        if pairs:
             snippet = (
-                "import argostranslate.package as p, argostranslate.translate as t\n"
-                "have={l.code for l in t.get_installed_languages()}\n"
+                "import argostranslate.package as p\n"
                 "p.update_package_index(); av=p.get_available_packages()\n"
-                f"for c in {argos!r}:\n"
-                "    pk=next((x for x in av if x.from_code==c and x.to_code=='en'),None)\n"
-                "    if not pk: print('no model for',c); continue\n"
-                "    print('downloading',c,'->en'); p.install_from_path(pk.download()); print('installed',c)\n")
+                f"for a,b in {pairs!r}:\n"
+                "    pk=next((x for x in av if x.from_code==a and x.to_code==b),None)\n"
+                "    if not pk: print('no model for',a,'->',b); continue\n"
+                "    print('downloading',a,'->',b); p.install_from_path(pk.download()); print('installed',a,'->',b)\n")
             if self.run([VPY, "-c", snippet]) != 0:
                 self.say("Some models did not download; they will download on first use instead.")
 
@@ -270,6 +305,7 @@ class Wizard(tk.Tk):
                 "$d=[Environment]::GetFolderPath('Desktop');"
                 "$s=(New-Object -ComObject WScript.Shell).CreateShortcut(\"$d\\Polyglass.lnk\");"
                 f"$s.TargetPath='{VPYW}';$s.Arguments='\"{APP}\"';$s.WorkingDirectory='{APP_DIR}';"
+                f"$s.IconLocation='{ICON}';"
                 "$s.Description='Translate your screen in place';$s.Save()")
             self.run(["powershell", "-NoProfile", "-Command", ps])
         self.step("Done", 100)

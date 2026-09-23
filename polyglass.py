@@ -1,22 +1,30 @@
 """
 Polyglass - transparent click-through overlay that translates on-screen
-text (Chinese, Japanese, Korean, Russian, Arabic, ... or Latin-script languages)
-into English, drawn in place over the original text.  Windows only.
+text (Chinese, Japanese, Korean, Russian, Arabic, English, ... or other
+Latin-script languages) into the language you choose, drawn in place over the
+original.  Windows only.
 
 Hotkeys
     Ctrl+Alt+T   translate the screen once
     Ctrl+Alt+L   toggle live mode (re-scans about every 1.5 s)
+    Ctrl+Alt+D   switch the output language: English <-> your chosen language
     Ctrl+Alt+C   clear the overlay
     Ctrl+Alt+Q   quit
+
+Settings live in polyglass.json next to this file (the setup wizard writes it):
+    "other_language"   your chosen output language besides English (e.g. "ja", "es")
+    "translate_to"     the current output language, "en" or other_language
 
 How it works
     1. mss grabs the primary monitor.
     2. Windows' built-in OCR reads it, once per installed OCR language; the
        language whose script best matches the text wins.  Latin-script text
        falls back to langdetect.
-    3. Argos Translate (offline) translates each line to English.
+       Text already in the output language is skipped.
+    3. Argos Translate (offline) translates each line, pivoting through
+       English when there is no direct model.
     4. A borderless, topmost, click-through Tk window (transparent colour key)
-       paints English boxes exactly where the source lines were.  The window is
+       paints the translations exactly where the source lines were.  The window is
        excluded from screen capture, so the OCR never reads its own output.
 """
 import os
@@ -32,6 +40,7 @@ if sys.stdout is None or sys.stderr is None:
         sys.stderr = _log
 
 import asyncio
+import json
 import traceback
 import ctypes
 import queue
@@ -71,6 +80,7 @@ except Exception:  # optional
     detect_langs = None
 
 TRANSPARENT = "#010101"
+HINT = "Ctrl+Alt+  T translate  L live  D direction  C clear  Q quit"
 LIVE_INTERVAL = 1.5
 CHANGE_THRESHOLD = 2.0   # mean abs diff on a 160x90 thumbnail to trigger a rescan
 MIN_SCRIPT_FRACTION = 0.3
@@ -82,7 +92,39 @@ SCRIPTS = {
     "sr": ("CYRILLIC",), "ar": ("ARABIC",), "fa": ("ARABIC",),
     "he": ("HEBREW",), "th": ("THAI",), "el": ("GREEK",), "hi": ("DEVANAGARI",),
 }
+NAMES = {"en": "English", "zh": "Chinese", "zt": "Chinese (Traditional)", "ja": "Japanese",
+         "ko": "Korean", "ru": "Russian", "ar": "Arabic", "es": "Spanish", "fr": "French",
+         "de": "German", "pt": "Portuguese", "it": "Italian"}
+# Segoe UI has no CJK glyphs; use the matching Windows UI font for those outputs.
+FONTS = {"ja": "Yu Gothic UI", "zh": "Microsoft YaHei UI", "zt": "Microsoft JhengHei UI",
+         "ko": "Malgun Gothic"}
+CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "polyglass.json")
 CJK_RE = re.compile(r"(?<=[⺀-鿿　-ヿ＀-￯]) +(?=[⺀-鿿　-ヿ＀-￯])")
+
+
+def load_config():
+    try:
+        with open(CONFIG_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except (OSError, ValueError):
+        return {}
+
+
+def save_config(cfg):
+    try:
+        with open(CONFIG_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, indent=2)
+    except OSError as e:
+        print(f"[config] could not save: {e}", flush=True)
+
+
+def name(code):
+    return NAMES.get(code, code.upper())
+
+
+def family(code):
+    """Treat Simplified and Traditional Chinese as one language when skipping text."""
+    return "zh" if code in ("zh", "zt") else code
 
 
 # --------------------------------------------------------------------------- OCR
@@ -167,12 +209,13 @@ def rapid_ocr(rgb):
     return ("ja" if kana else "zh"), lines
 
 
-def ocr_all(bgra, w, h, rgb=None):
-    """Return (argos_from_code, [(text, rect), ...]) for the best language, or (None, [])."""
+def ocr_all(bgra, w, h, rgb=None, target="en"):
+    """Return (argos_from_code, [(text, rect), ...]) for the best language that is not
+    already `target`, or (None, [])."""
     if rgb is not None:
         code, lines = rapid_ocr(rgb)
         print(f"[ocr] RapidOCR: {len(lines)} CJK lines", flush=True)
-        if lines:
+        if lines and family(code) != family(target):
             return code, lines
     bmp = make_bitmap(bgra, w, h)
     langs = list(OcrEngine.available_recognizer_languages)
@@ -190,8 +233,10 @@ def ocr_all(bgra, w, h, rgb=None):
                 if p == "en" and engine is not None and latin is None:
                     latin = (tag, await _ocr(engine, bmp))
                 continue
-            lines = await _ocr(engine, bmp)
             prefixes = SCRIPTS.get(p)
+            if prefixes and family(argos_code(tag)) == family(target):
+                continue                               # already in the output language
+            lines = await _ocr(engine, bmp)
             if prefixes is None:                       # Latin-script language pack
                 if latin is None:
                     latin = (tag, lines)
@@ -212,7 +257,7 @@ def ocr_all(bgra, w, h, rgb=None):
             if len(joined) > 20:
                 try:
                     top = detect_langs(joined)[0]
-                    if top.lang != "en" and top.prob > 0.8:
+                    if top.lang != target and top.prob > 0.8:
                         return top.lang, latin[1]
                 except Exception:
                     pass
@@ -228,37 +273,49 @@ class Translator:
         self.cache = {}
         self.unavailable = set()
 
-    def ensure(self, code):
-        if code in self.unavailable:
-            return False
-        installed = {l.code: l for l in argostranslate.translate.get_installed_languages()}
-        if code in installed and "en" in installed and installed[code].get_translation(installed["en"]):
-            return True
-        self.status(f"Downloading offline model {code} -> en (first time only)...")
+    @staticmethod
+    def installed(src, dst):
+        langs = {l.code: l for l in argostranslate.translate.get_installed_languages()}
+        # get_translation also finds a route through English (e.g. ja -> en -> es).
+        return src in langs and dst in langs and bool(langs[src].get_translation(langs[dst]))
+
+    def ensure(self, code, target):
+        """Make sure an offline route code -> target exists, downloading models if needed.
+        Returns the source code to translate from (zt may fall back to zh), or None."""
+        if (code, target) in self.unavailable:
+            return None
+        if self.installed(code, target):
+            return code
+        self.status(f"Downloading offline model {code} -> {target} (first time only)...")
         try:
             argostranslate.package.update_package_index()
             pkgs = argostranslate.package.get_available_packages()
-            pkg = next((p for p in pkgs if p.from_code == code and p.to_code == "en"), None)
-            if pkg is None and code == "zt":
-                return self.ensure("zh")
-            if pkg is None:
-                self.unavailable.add(code)
-                self.status(f"No offline model for '{code}'.")
-                return False
-            argostranslate.package.install_from_path(pkg.download())
-            return True
+            find = lambda a, b: next((p for p in pkgs if p.from_code == a and p.to_code == b), None)
+            direct = find(code, target)
+            # No direct model: go through English, e.g. ja -> en -> es.
+            route = [direct] if direct else [find(code, "en"), find("en", target)]
+            if None in route and code == "zt":
+                return self.ensure("zh", target)
+            if None in route:
+                self.unavailable.add((code, target))
+                self.status(f"No offline model for {name(code)} -> {name(target)}.")
+                return None
+            for pkg in route:
+                if not self.installed(pkg.from_code, pkg.to_code):
+                    argostranslate.package.install_from_path(pkg.download())
+            return code
         except Exception as e:
             self.status(f"Model download failed: {e}")
-            return False
+            return None
 
-    def translate(self, code, text):
+    def translate(self, code, target, text):
         text = CJK_RE.sub("", text).strip()
         if not text:
             return ""
-        key = (code, text)
+        key = (code, target, text)
         if key not in self.cache:
             try:
-                self.cache[key] = argostranslate.translate.translate(text, code, "en")
+                self.cache[key] = argostranslate.translate.translate(text, code, target)
             except Exception:
                 self.cache[key] = text
         return self.cache[key]
@@ -277,6 +334,11 @@ class Overlay:
         self.regions = []
         self.region_sigs = []
         self.translator = Translator(lambda m: self.jobs.put(("status", m)))
+        self.config = load_config()
+        self.other = self.config.get("other_language") or None
+        self.target = self.config.get("translate_to", "en")
+        if self.target not in ("en", self.other):
+            self.target = "en"
 
         with mss.MSS() as sct:
             mon = sct.monitors[1]
@@ -295,12 +357,13 @@ class Overlay:
         keys = {
             "<ctrl>+<alt>+t": lambda: self.cmds.put("once"),
             "<ctrl>+<alt>+l": lambda: self.cmds.put("live"),
+            "<ctrl>+<alt>+d": lambda: self.cmds.put("direction"),
             "<ctrl>+<alt>+c": lambda: self.cmds.put("clear"),
             "<ctrl>+<alt>+q": lambda: self.cmds.put("quit"),
         }
         keyboard.GlobalHotKeys(keys).start()
         self.build_bar()
-        self.show_status("Ready: press Ctrl+Alt+T over the text you want translated", 6000)
+        self.show_status(f"Ready: press Ctrl+Alt+T to translate into {name(self.target)}", 6000)
         self.root.after(50, self.pump)
         threading.Thread(target=self.live_loop, daemon=True).start()
 
@@ -341,6 +404,8 @@ class Overlay:
                 elif cmd == "live":
                     self.live = not self.live
                     self.show_status("Live mode ON" if self.live else "Live mode OFF", 1500)
+                elif cmd == "direction":
+                    self.switch_direction()
                 elif cmd == "clear":
                     self.canvas.delete("tr")
                 elif cmd == "quit":
@@ -365,10 +430,22 @@ class Overlay:
             traceback.print_exc()
         self.root.after(50, self.pump)
 
+    def switch_direction(self):
+        if not self.other:
+            self.show_status("No output language set: run Install.bat and pick one under Also translate into", 5000)
+            return
+        self.target = self.other if self.target == "en" else "en"
+        self.config["translate_to"] = self.target
+        save_config(self.config)
+        self.canvas.delete("tr")
+        self.last_thumb = None                  # make live mode rescan right away
+        self.regions, self.region_sigs = [], []
+        self.show_status(f"Now translating into {name(self.target)}", 2500)
+
     # -- persistent top bar ---------------------------------------------------
     def build_bar(self):
         W = self.mon["width"]
-        bw, bh, y0 = 640, 40, 8
+        bw, bh, y0 = 760, 40, 8
         x0 = (W - bw) // 2
         x1, y1, r = x0 + bw, y0 + bh, 16
         pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1,
@@ -382,7 +459,7 @@ class Overlay:
         self.msg_id = c.create_text(x0 + 46, cy, anchor="w", text="", fill="#f5f5f5",
                                     font=("Segoe UI", 11, "bold"), tags="bar")
         self.hint_id = c.create_text(x1 - 16, cy, anchor="e", fill="#8b93a7",
-                                     text="Ctrl+Alt+  T translate  L live  C clear  Q quit",
+                                     text=HINT,
                                      font=("Segoe UI", 9), tags="bar")
         self.msg = ""
         self.msg_until = 0.0
@@ -396,8 +473,9 @@ class Overlay:
         if self.msg and now < self.msg_until:
             text, hint = self.msg, ""
         else:
-            text = "Polyglass  \u2022  " + ("LIVE" if self.live else "Ready")
-            hint = "Ctrl+Alt+  T translate  L live  C clear  Q quit"
+            text = ("Polyglass  \u2022  " + ("LIVE" if self.live else "Ready")
+                    + f"  \u2022  \u2192 {self.target.upper()}")
+            hint = HINT
         c.itemconfigure(self.msg_id, text=text)
         c.itemconfigure(self.hint_id, text=hint)
         if self.working:
@@ -417,9 +495,12 @@ class Overlay:
             self.msg_until = time.time() + ms / 1000.0
 
     def wrap(self, text, font, width):
+        # Chinese and Japanese have no spaces, so wrap those by character.
+        sep = " " if " " in text.strip() else ""
+        words = text.split() if sep else list(text.strip())
         lines, cur = [], ""
-        for word in text.split():
-            trial = f"{cur} {word}".strip()
+        for word in words:
+            trial = f"{cur}{sep}{word}" if cur else word
             if font.measure(trial) <= width or not cur:
                 cur = trial
             else:
@@ -429,7 +510,8 @@ class Overlay:
             lines.append(cur)
         return lines or [""]
 
-    def draw(self, items):
+    def draw(self, payload):
+        items, font_family = payload
         print(f"[draw] painting {len(items)} translated lines", flush=True)
         for it in items[:8]:
             print(f"      ({it[0]:.0f},{it[1]:.0f}) -> {it[4]!r}", flush=True)
@@ -439,7 +521,7 @@ class Overlay:
             bx, by, bw = x - pad, y - pad, w + 2 * pad
             font, lines = None, None
             for size in range(max(9, min(40, int(h * 0.85))), 8, -1):
-                font = tkfont.Font(family="Segoe UI", size=-size)
+                font = tkfont.Font(family=font_family, size=-size)
                 lines = self.wrap(text, font, bw - 2 * pad)
                 if len(lines) * font.metrics("linespace") <= h + 2 * pad:
                     break
@@ -490,6 +572,7 @@ class Overlay:
 
     def work(self, force):
         hidden = False
+        target = self.target
         try:
             with mss.MSS() as sct:
                 shot = sct.grab(self.mon)
@@ -513,29 +596,30 @@ class Overlay:
                 img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
             w, h = shot.size
             print(f"[capture] {w}x{h}, mean brightness {np.asarray(img).mean():.0f}", flush=True)
-            code, lines = ocr_all(shot.bgra, w, h, np.asarray(img))
-            print(f"[ocr] source language={code}, foreign lines found={len(lines)}", flush=True)
+            code, lines = ocr_all(shot.bgra, w, h, np.asarray(img), target)
+            print(f"[ocr] source language={code}, target={target}, lines found={len(lines)}", flush=True)
             self.regions = [r for _, r in lines]
             self.region_sigs = [self.sig(img, r) for r in self.regions]
             for t, r in lines[:5]:
                 print(f"      {t!r}", flush=True)
             if not code or not lines:
-                self.jobs.put(("draw", []))
+                self.jobs.put(("draw", ([], "Segoe UI")))
                 if force:
-                    self.jobs.put(("status", "No foreign text found."))
+                    self.jobs.put(("status", f"No text to translate into {name(target)}."))
                 return
-            if not self.translator.ensure(code):
+            code = self.translator.ensure(code, target)
+            if not code:
                 return
             items = []
             for text, (x, y, bw, bh) in lines:
-                en = self.translator.translate(code, text)
-                if not en:
+                out = self.translator.translate(code, target, text)
+                if not out:
                     continue
                 bg = self.sample_bg(img, x, y, bw, bh)
                 lum = 0.299 * bg[0] + 0.587 * bg[1] + 0.114 * bg[2]
-                items.append((x, y, bw, bh, en, "#%02x%02x%02x" % bg,
+                items.append((x, y, bw, bh, out, "#%02x%02x%02x" % bg,
                               "#111111" if lum > 140 else "#f5f5f5"))
-            self.jobs.put(("draw", items))
+            self.jobs.put(("draw", (items, FONTS.get(target, "Segoe UI"))))
         except Exception as e:
             traceback.print_exc()
             self.jobs.put(("status", f"Error: {e}"))
