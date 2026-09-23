@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Polyglass</title>
+<meta name="description" content="A transparent overlay for Windows that translates foreign text on your screen in place, fully offline.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect x='3' y='3' width='26' height='26' rx='7' fill='%234f7cff'/><text x='16' y='22' font-size='15' text-anchor='middle' fill='white' font-family='sans-serif' font-weight='700'>P</text></svg>">
+<style>
+  :root {
+    --bg: #fbfbfd;
+    --surface: #ffffff;
+    --text: #15171c;
+    --muted: #5d6270;
+    --border: #e3e5ec;
+    --accent: #3d68f0;
+    --accent-text: #ffffff;
+    --code-bg: #f1f3f8;
+    --screen: #1b1e27;
+    --screen-text: #e9ebf2;
+    --overlay-bg: #262a36;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #0f1116;
+      --surface: #171a21;
+      --text: #eceef4;
+      --muted: #a0a6b5;
+      --border: #2a2f3a;
+      --accent: #6b8dff;
+      --accent-text: #0b0d12;
+      --code-bg: #1f232d;
+      --screen: #0a0c11;
+      --screen-text: #e9ebf2;
+      --overlay-bg: #161923;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  }
+  a { color: var(--accent); }
+  .wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
+
+  header { padding: 20px 0; }
+  header .wrap { display: flex; justify-content: space-between; align-items: center; }
+  .logo { font-weight: 700; font-size: 18px; color: var(--text); text-decoration: none; }
+  header nav a { color: var(--muted); text-decoration: none; margin-left: 20px; font-size: 15px; }
+  header nav a:hover { color: var(--text); }
+
+  .hero { padding: 56px 0 40px; text-align: center; }
+  .hero h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.1; margin: 0 0 16px; letter-spacing: -0.02em; }
+  .hero p { font-size: 19px; color: var(--muted); max-width: 620px; margin: 0 auto 28px; }
+  .buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+  .btn {
+    display: inline-block; padding: 12px 22px; border-radius: 10px;
+    font-weight: 600; text-decoration: none; border: 1px solid var(--border);
+    color: var(--text); background: var(--surface);
+  }
+  .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
+  .small { font-size: 14px; color: var(--muted); margin-top: 14px; }
+
+  /* Demo: a fake screen whose lines swap to their translation */
+  .demo {
+    margin: 32px auto 0; max-width: 640px; border-radius: 14px; overflow: hidden;
+    background: var(--screen); color: var(--screen-text);
+    border: 1px solid var(--border); text-align: left;
+    box-shadow: 0 20px 50px rgba(0,0,0,.18);
+  }
+  .demo .bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 8px 14px; font-size: 13px; background: rgba(255,255,255,.06);
+  }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: #3ecf8e; }
+  .demo .lines { padding: 22px 24px 26px; display: grid; gap: 14px; }
+  .line { position: relative; font-size: 18px; min-height: 1.6em; }
+  .line .src, .line .dst { transition: opacity .5s; }
+  .line .dst {
+    position: absolute; inset: 0; opacity: 0;
+    background: var(--overlay-bg); padding: 0 4px; margin: 0 -4px;
+  }
+  .demo.on .line .src { opacity: 0; }
+  .demo.on .line .dst { opacity: 1; }
+  @media (prefers-reduced-motion: reduce) {
+    .line .src, .line .dst { transition: none; }
+  }
+
+  section { padding: 48px 0; }
+  h2 { font-size: 28px; margin: 0 0 20px; letter-spacing: -0.01em; }
+  .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
+  .card h3 { margin: 0 0 6px; font-size: 17px; }
+  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+
+  ol.steps { padding-left: 22px; margin: 0; }
+  ol.steps li { margin-bottom: 10px; }
+  table { border-collapse: collapse; width: 100%; max-width: 480px; }
+  td { padding: 10px 0; border-bottom: 1px solid var(--border); }
+  kbd {
+    font: 13px ui-monospace, Consolas, monospace; background: var(--code-bg);
+    border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; white-space: nowrap;
+  }
+  .note { color: var(--muted); font-size: 15px; }
+
+  footer { padding: 32px 0 48px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
+
+  @media (max-width: 520px) {
+    header nav a:not(:last-child) { display: none; }
+    .hero { padding-top: 32px; }
+    .line { font-size: 16px; }
+  }
+</style>
+</head>
+<body>
+<header>
+  <div class="wrap">
+    <a class="logo" href="#">Polyglass</a>
+    <nav>
+      <a href="#features">Features</a>
+      <a href="#install">Install</a>
+      <a href="https://github.com/APierce-Ptak/polyglass">GitHub</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <h1>See any language, in place.</h1>
+    <p>Polyglass is a transparent overlay for Windows that reads foreign text on your screen and draws the English translation right over it. It works on games, videos, apps and web pages, and runs fully offline.</p>
+    <div class="buttons">
+      <a class="btn primary" href="https://github.com/APierce-Ptak/polyglass/archive/refs/heads/main.zip">Download for Windows</a>
+      <a class="btn" href="https://github.com/APierce-Ptak/polyglass">View on GitHub</a>
+    </div>
+    <div class="small">Windows 10 or 11 · Free and open source (MIT)</div>
+
+    <div class="demo" id="demo" aria-label="Example: Japanese and Chinese text replaced by English in place">
+      <div class="bar"><span class="dot"></span><span id="status">Polyglass · live mode</span></div>
+      <div class="lines">
+        <div class="line"><span class="src">冒険を始めますか？</span><span class="dst">Do you want to start the adventure?</span></div>
+        <div class="line"><span class="src">新しいアイテムを手に入れた！</span><span class="dst">You got a new item!</span></div>
+        <div class="line"><span class="src">设置 · 保存游戏 · 退出</span><span class="dst">Settings · Save game · Quit</span></div>
+      </div>
+    </div>
+  </div>
+
+  <section id="features">
+    <div class="wrap">
+      <h2>What it does</h2>
+      <div class="grid">
+        <div class="card"><h3>Translates in place</h3><p>Each translation is painted over its source line, on a background colour sampled from your screen.</p></div>
+        <div class="card"><h3>Fully offline</h3><p>OCR and translation both run on your PC. Nothing is sent anywhere.</p></div>
+        <div class="card"><h3>Many languages</h3><p>Chinese, Japanese, Korean, Russian, Arabic, and Latin-script languages like Spanish, French and German.</p></div>
+        <div class="card"><h3>Live mode</h3><p>Re-translates only when the text on screen actually changes, so it stays light on CPU.</p></div>
+        <div class="card"><h3>Click-through</h3><p>The overlay never gets in the way. Keep playing or working normally.</p></div>
+        <div class="card"><h3>Game-font friendly</h3><p>RapidOCR handles stylised Chinese and Japanese fonts; Windows OCR covers the rest.</p></div>
+      </div>
+    </div>
+  </section>
+
+  <section id="install">
+    <div class="wrap">
+      <h2>Install</h2>
+      <ol class="steps">
+        <li><a href="https://github.com/APierce-Ptak/polyglass/archive/refs/heads/main.zip">Download the ZIP</a> and unzip it.</li>
+        <li>Double-click <strong>Install.bat</strong>.</li>
+        <li>Follow the setup wizard. It sets up Python, installs OCR language packs and offline translation models for the languages you pick, and makes a desktop shortcut.</li>
+      </ol>
+      <p class="note">Needs an internet connection for setup and about 3 GB of disk space. If Python 3.10–3.12 is missing, the installer gets it for you.</p>
+    </div>
+  </section>
+
+  <section>
+    <div class="wrap">
+      <h2>Use</h2>
+      <p>Start Polyglass, click the window with foreign text, and press:</p>
+      <table>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd></td><td>Translate the screen once</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd></td><td>Turn live mode on or off</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd></td><td>Clear the overlay</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Q</kbd></td><td>Quit</td></tr>
+      </table>
+      <p class="note">Run games in windowed or borderless mode. Exclusive fullscreen draws above any overlay.</p>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <span>Polyglass · MIT License</span>
+    <a href="https://github.com/APierce-Ptak/polyglass">github.com/APierce-Ptak/polyglass</a>
+  </div>
+</footer>
+
+<script>
+  // Alternate the demo between the original text and its translation.
+  const demo = document.getElementById('demo');
+  const status = document.getElementById('status');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  let on = false;
+  function tick() {
+    on = !on;
+    demo.classList.toggle('on', on);
+    status.textContent = on ? 'Polyglass · translated 3 lines' : 'Polyglass · live mode';
+  }
+  setTimeout(tick, 1200);
+  setInterval(tick, reduce ? 6000 : 3200);
+</script>
+</body>
+</html>

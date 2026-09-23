@@ -2,6 +2,8 @@
 
 *See any language, in place.*
 
+**Website:** https://apierce-ptak.github.io/polyglass/ · **[Download for Windows](https://github.com/APierce-Ptak/polyglass/archive/refs/heads/main.zip)**
+
 A transparent, click-through overlay for Windows that reads foreign text on your screen and draws the English translation **in the same spot**, right over the original. It works on games, videos, apps, and web pages.
 
 - Translates Chinese, Japanese, Korean, Russian, Arabic, and Latin-script languages (Spanish, French, German, and others) into English.
