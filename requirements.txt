@@ -1,0 +1,8 @@
+mss
+pillow
+numpy
+pynput
+winsdk
+argostranslate
+langdetect
+rapidocr-onnxruntime
