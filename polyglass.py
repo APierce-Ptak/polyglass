@@ -19,6 +19,8 @@ Settings live in polyglass.json next to this file (the setup wizard and the bar 
     "to"     the language to translate into (e.g. "en", "es")
     "monitor"  optional: which screen to cover, 1 = the first, 2 = the second, ...
                (leave it out for the main screen)
+    "models"   optional: "argos" to use only Argos Translate's models, even where an
+               Opus-MT model is installed (the default prefers Opus-MT)
 With "from" set to a language, the screen is read as that language; with "auto" it is detected.
 
 How it works
@@ -27,8 +29,8 @@ How it works
        language whose script best matches the text wins.  Latin-script text
        falls back to langdetect.
        Text already in the output language is skipped.
-    3. Argos Translate (offline) translates each line, pivoting through
-       English when there is no direct model.
+    3. Offline models translate each line, pivoting through English when there is
+       no direct model: Opus-MT (Helsinki-NLP) where installed, otherwise Argos Translate.
     4. A borderless, topmost, click-through Tk window (transparent colour key)
        paints the translations exactly where the source lines were.  The window is
        excluded from screen capture, so the OCR never reads its own output.
@@ -50,6 +52,7 @@ import asyncio
 import json
 import traceback
 import ctypes
+import pathlib
 import queue
 import re
 import subprocess
@@ -78,6 +81,7 @@ from PIL import Image
 # CTranslate2 directly. (argostranslate.translate imports stanza, which needs PyTorch.)
 import argostranslate.package
 import ctranslate2
+import sentencepiece
 
 import model_sizes
 from winsdk.windows.globalization import Language
@@ -122,6 +126,8 @@ NAMES = {"en": "English", "zh": "Chinese", "zt": "Chinese (Traditional)", "ja": 
 FONTS = {"ja": "Yu Gothic UI", "zh": "Microsoft YaHei UI", "zt": "Microsoft JhengHei UI",
          "ko": "Malgun Gothic"}
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "polyglass.json")
+# Opus-MT models (Helsinki-NLP, converted to CTranslate2): <from>-<to>\model\
+OPUS_DIR = os.path.join(os.path.expanduser("~"), ".local", "share", "polyglass", "opus-mt")
 CJK_CHARS = re.compile(r"[⺀-鿿　-ヿ가-힯＀-￯]")
 CJK_RE = re.compile(r"(?<=[⺀-鿿　-ヿ＀-￯]) +(?=[⺀-鿿　-ヿ＀-￯])")
 
@@ -311,6 +317,48 @@ def install_model(path):
     os.remove(path)                    # the download isn't needed once it's unpacked
 
 
+class OpusTokenizer:
+    """Opus-MT's two SentencePiece models: one for the source text, one for the output."""
+    def __init__(self, folder):
+        self.folder = folder
+        self.src = self.tgt = None
+
+    def load(self):
+        if self.src is None:
+            self.src = sentencepiece.SentencePieceProcessor(os.path.join(self.folder, "source.spm"))
+            self.tgt = sentencepiece.SentencePieceProcessor(os.path.join(self.folder, "target.spm"))
+
+    def encode(self, text):
+        self.load()
+        return self.src.encode(text, out_type=str) + ["</s>"]
+
+    def decode(self, tokens):
+        self.load()
+        return self.tgt.decode([t for t in tokens if t != "</s>"])
+
+
+class OpusModel:
+    """An installed Opus-MT model, shaped like an Argos package so the rest of
+    Translator treats both the same."""
+    type = "translate"
+    target_prefix = None
+
+    def __init__(self, folder):
+        self.package_path = pathlib.Path(folder)
+        self.from_code, self.to_code = os.path.basename(folder).split("-")
+        self.tokenizer = OpusTokenizer(os.path.join(folder, "model"))
+
+    @staticmethod
+    def installed():
+        try:
+            names = os.listdir(OPUS_DIR)
+        except OSError:
+            return []
+        return [OpusModel(os.path.join(OPUS_DIR, n)) for n in names
+                if re.fullmatch(r"[a-z]{2}-[a-z]{2}", n)
+                and os.path.exists(os.path.join(OPUS_DIR, n, "model", "model.bin"))]
+
+
 class Translator:
     def __init__(self, status):
         self.status = status
@@ -320,9 +368,14 @@ class Translator:
 
     @staticmethod
     def installed_models():
-        """{(from_code, to_code): package} for every installed translation model."""
-        return {(p.from_code, p.to_code): p for p in argostranslate.package.get_installed_packages()
-                if p.type == "translate"}
+        """{(from_code, to_code): package} for every installed translation model.
+        Where both kinds cover a pair, Opus-MT wins (it scored higher in our tests)
+        unless polyglass.json says "models": "argos"."""
+        models = {(p.from_code, p.to_code): p for p in argostranslate.package.get_installed_packages()
+                  if p.type == "translate"}
+        if load_config().get("models") != "argos":
+            models.update({(m.from_code, m.to_code): m for m in OpusModel.installed()})
+        return models
 
     @staticmethod
     def route(src, dst, models):

@@ -74,6 +74,36 @@ class Routing(unittest.TestCase):
         self.assertTrue(Translator.ready("zt", "en", self.MODELS))
 
 
+class OpusModels(unittest.TestCase):
+    """Opus-MT models are found in OPUS_DIR and preferred over Argos's, unless turned off."""
+
+    def setUp(self):
+        self.dir = tempfile.TemporaryDirectory()
+        self.addCleanup(self.dir.cleanup)
+        for name in ("ja-en", "zh-en", "notes", "de-en"):
+            os.makedirs(os.path.join(self.dir.name, name, "model"))
+        for name in ("ja-en", "zh-en"):          # de-en has no model.bin: a broken download
+            open(os.path.join(self.dir.name, name, "model", "model.bin"), "w").close()
+        self.old_dir, polyglass.OPUS_DIR = polyglass.OPUS_DIR, self.dir.name
+        self.addCleanup(setattr, polyglass, "OPUS_DIR", self.old_dir)
+
+    def test_finds_complete_models_only(self):
+        found = sorted((m.from_code, m.to_code) for m in polyglass.OpusModel.installed())
+        self.assertEqual(found, [("ja", "en"), ("zh", "en")])
+
+    def test_preferred_unless_turned_off(self):
+        old = polyglass.load_config
+        self.addCleanup(setattr, polyglass, "load_config", old)
+        polyglass.load_config = lambda: {}
+        self.assertIsInstance(Translator.installed_models()[("ja", "en")], polyglass.OpusModel)
+        polyglass.load_config = lambda: {"models": "argos"}
+        self.assertNotIsInstance(Translator.installed_models().get(("ja", "en")), polyglass.OpusModel)
+
+    def test_missing_folder(self):
+        polyglass.OPUS_DIR = os.path.join(self.dir.name, "nowhere")
+        self.assertEqual(polyglass.OpusModel.installed(), [])
+
+
 class FakeFont:
     """10 px per character."""
     def measure(self, text):
@@ -275,9 +305,21 @@ class Translation(unittest.TestCase):
         self.check("zh", "en", "净利润增长了两倍。", "tripled")
 
     def test_japanese_short_labels(self):
-        # With unknown words allowed, いいえ came back untranslated and セーブ as "ブ".
+        # Argos's model: with unknown words allowed, いいえ came back untranslated and セーブ as "ブ".
+        old = polyglass.load_config
+        self.addCleanup(setattr, polyglass, "load_config", old)
+        polyglass.load_config = lambda: {"models": "argos"}
+        self.t.cache.clear()
+        self.addCleanup(self.t.cache.clear)
         self.check("ja", "en", "いいえ", "No")
         self.assertEqual(self.t.translate("ja", "en", "セーブ").lower(), "save")
+
+    def test_opus_mt(self):
+        # Short labels the Argos model got wrong ("Close", "Home").
+        if not any(m.from_code == "ja" for m in polyglass.OpusModel.installed()):
+            self.skipTest("Opus-MT ja -> en not installed")
+        self.assertEqual(self.t.translate("ja", "en", "終了"), "Quit")
+        self.assertEqual(self.t.translate("ja", "en", "戻る"), "Back")
 
     def test_through_english(self):
         self.check("fr", "es", "Bienvenue dans notre boutique en ligne.", "tienda")

@@ -10,6 +10,7 @@ $dataRoot = if ($env:XDG_DATA_HOME) { $env:XDG_DATA_HOME } else { Join-Path $HOM
 $cacheRoot = if ($env:XDG_CACHE_HOME) { $env:XDG_CACHE_HOME } else { Join-Path $HOME '.local\cache' }
 $models = Join-Path $dataRoot 'argos-translate'
 $modelCache = Join-Path $cacheRoot 'argos-translate'
+$opusModels = Join-Path $HOME '.local\share\polyglass'      # Opus-MT models (polyglass.OPUS_DIR)
 $shortcut = Join-Path ([Environment]::GetFolderPath('Desktop')) 'Polyglass.lnk'
 $ocrList = Join-Path $app 'ocr_added.txt'
 $files = 'polyglass.json', 'polyglass.log', 'setup_wizard.log', '__pycache__' | ForEach-Object { Join-Path $app $_ }
@@ -37,6 +38,7 @@ $items = @(
     @{ Label = 'App packages (.venv)'; Path = $venv },
     @{ Label = 'Translation models'; Path = $models },
     @{ Label = 'Model download cache'; Path = $modelCache },
+    @{ Label = 'Opus-MT models'; Path = $opusModels },
     @{ Label = 'Desktop shortcut'; Path = $shortcut }
 ) | Where-Object { Test-Path -LiteralPath $_.Path }
 
