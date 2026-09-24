@@ -59,7 +59,7 @@ Games should run in **windowed or borderless** mode. Exclusive fullscreen draws 
 
 Run `Debug.bat` to see a console with what the app is doing. It prints the installed OCR languages, the text found, and what it draws. The shortcut writes the same information to `polyglass.log`.
 
-- **Says only `en-US` is installed:** re-run `Install.bat` and tick the language, then accept the Windows permission prompt.
+- **Accents misread, or Korean/Russian/Arabic not read:** Windows is missing that language's text recognition. Click the blue *Add Windows text recognition* message in the bar (or re-run `Install.bat`) and accept the Windows permission prompt.
 - **Nothing appears over a game:** switch the game to windowed or borderless.
 - **Ctrl+Alt+D won't swap:** *From* is set to *Detect language*, so there's nothing to swap with. Click *From* in the bar and pick a language.
 - **Wrong or odd translations:** offline models are good but not perfect. Text is translated line by line.
