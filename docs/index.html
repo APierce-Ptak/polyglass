@@ -117,12 +117,12 @@
   <div class="wrap hero">
     <img class="hero-logo" src="logo.png" alt="Polyglass logo: a parrot perched on a pane of glass">
     <h1>See any language, in place.</h1>
-    <p>Polyglass is a transparent overlay for Windows that reads the text on your screen and draws the translation, in the language you choose, right over it. Spanish, Japanese, English and more. It works on games, videos, apps and web pages, and runs fully offline.</p>
+    <p>Polyglass is a transparent overlay for Windows that reads the text on your screen and draws the translation, in the language you choose, right over it. Spanish, Japanese, English and more. It works on anything on your screen, and everything stays on your PC.</p>
     <div class="buttons">
       <a class="btn primary" href="https://github.com/APierce-Ptak/polyglass/archive/refs/heads/main.zip">Download for Windows</a>
       <a class="btn" href="https://github.com/APierce-Ptak/polyglass">View on GitHub</a>
     </div>
-    <div class="small">Windows 10 or 11 · Free and open source (MIT)</div>
+    <div class="small">Windows 10 or 11 · 100% local and private · No accounts or API keys · Free and open source (MIT)</div>
 
     <img class="demo" src="demo.gif" width="820" height="674"
          alt="Recording: a Chinese quarterly financial report on screen is replaced, line by line in place, with its English translation">
@@ -132,8 +132,10 @@
     <div class="wrap">
       <h2>What it does</h2>
       <div class="grid">
+        <div class="card"><h3>Private by design</h3><p>Your screen never leaves your PC. Reading and translating both run locally: no cloud, no account, nothing uploaded.</p></div>
+        <div class="card"><h3>Works on anything on screen</h3><p>Games, videos, PDFs, images, apps, web pages, remote desktops. If you can see it, it can translate it. No plugins or integrations.</p></div>
+        <div class="card"><h3>Plug and play</h3><p>No API keys, sign-ups or subscriptions. Internet is only needed once, for setup, and later only if you add a new language.</p></div>
         <div class="card"><h3>Translates in place</h3><p>Each translation is painted over its source line, on a background colour sampled from your screen.</p></div>
-        <div class="card"><h3>Fully offline</h3><p>OCR and translation both run on your PC. Nothing is sent anywhere.</p></div>
         <div class="card"><h3>Any language, any direction</h3><p>Pick From and To in the on-screen bar like Google Translate, or let it detect the language. New languages download with one click. Ctrl+Alt+D swaps them.</p></div>
         <div class="card"><h3>Many languages</h3><p>Chinese, Japanese, Korean, Russian, Arabic, and Latin-script languages like Spanish, French and German, including stylised game fonts.</p></div>
         <div class="card"><h3>Live mode</h3><p>Re-translates only when the text on screen actually changes, so it stays light on CPU.</p></div>
@@ -150,7 +152,7 @@
         <li>Double-click <strong>Install.bat</strong>.</li>
         <li>Follow the setup wizard. Choose <em>Translate from</em> (or <em>Detect language</em>) and <em>Translate to</em>. It sets up Python, OCR language packs and offline translation models, and makes a desktop shortcut.</li>
       </ol>
-      <p class="note">Needs an internet connection for setup and about 3 GB of disk space. If Python 3.10–3.12 is missing, the installer gets it for you.</p>
+      <p class="note">Needs an internet connection once, for setup, and about 3 GB of disk space. After that it runs offline. If Python 3.10–3.12 is missing, the installer gets it for you.</p>
       <p class="note"><strong>Uninstalling</strong> is just as easy: double-click <strong>Uninstall.bat</strong>. It removes the app's packages, the translation models (stored outside the app folder), the shortcut and your settings, then you delete the folder.</p>
     </div>
   </section>

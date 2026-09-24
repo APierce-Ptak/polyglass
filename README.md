@@ -19,7 +19,9 @@ A transparent, click-through overlay for Windows that reads the text on your scr
 
 - **Any language to any language.** Pick *From* and *To* in the bar at the top of the screen, like Google Translate, or leave *From* on *Detect language*. Installed languages show ✓; others show ⬇ Download and download when you pick them. The ⇄ button (or Ctrl+Alt+D) swaps them.
 - Supports Chinese, Japanese, Korean, Russian, Arabic, and Latin-script languages (Spanish, French, German, and others). Between two non-English languages (for example Japanese → Spanish), it translates through English.
-- Fully offline: OCR and translation both run on your PC.
+- **Private and fully local:** reading and translating both run on your PC, and nothing is uploaded. No accounts, API keys or subscriptions.
+- **Works on anything on your screen:** games, videos, PDFs, apps, web pages, remote desktops. No plugins or integrations.
+- **Plug and play:** internet is only needed once, for setup (and later only to add a language).
 - Live mode re-translates only when the text on screen actually changes, so it doesn't waste CPU.
 - Always-on bar at the top of the screen with the language pickers and a loading spinner while it works.
 - Click-through: you keep using your game or app normally.
