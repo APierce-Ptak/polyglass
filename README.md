@@ -33,7 +33,7 @@ A transparent, click-through overlay for Windows that reads the text on your scr
 2. Double-click **`Install.bat`**.
 3. Follow the setup wizard. Choose *Translate from* (or *Detect language*) and *Translate to*, with a ⇄ button to swap them. The wizard creates a private Python environment, installs the packages, adds Windows OCR language packs, downloads the offline translation models, and makes a desktop shortcut.
 
-Requirements: Windows 10 or 11, an internet connection for setup, and about 450 MB of free disk space plus your languages (usually 150-400 MB each; setup and the language bar show the exact size before downloading). If Python 3.10-3.12 is missing, `Install.bat` installs it with winget or sends you to the download page.
+Requirements: Windows 10 or 11, an internet connection for setup, and about 450 MB of free disk space plus your languages (usually 150-400 MB each; setup and the language bar show the exact size before downloading). If Python 3.10-3.12 is missing, `Install.bat` installs it with [winget](https://github.com/microsoft/winget-cli) or sends you to the download page.
 
 ## Use
 
