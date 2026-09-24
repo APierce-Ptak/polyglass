@@ -111,6 +111,27 @@
     .slide, .line .src, .line .dst { transition: none; }
   }
 
+  /* Dictionary entry for the name */
+  .entry {
+    max-width: 600px; margin: 0 auto; padding: 26px 28px; text-align: left;
+    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    font-family: Georgia, "Times New Roman", serif;
+  }
+  .entry .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 0 14px; }
+  .entry .word { font-size: 32px; font-weight: 700; letter-spacing: .01em; }
+  .entry .ipa { font-size: 17px; color: var(--muted); }
+  .entry .pos { font-size: 16px; font-style: italic; color: var(--muted); }
+  .entry h3 { font: 600 12px/1 system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
+              color: var(--muted); margin: 18px 0 8px; }
+  .entry p, .entry li { font-size: 16.5px; line-height: 1.55; margin: 0; }
+  .entry ul { margin: 0; padding-left: 20px; }
+  .entry ul li { margin-bottom: 6px; }
+  .entry ol { margin: 0; padding-left: 22px; }
+  .entry ol li { margin-bottom: 6px; }
+  .entry .aside { color: var(--muted); font-size: 14.5px; margin-top: 4px; }
+  .entry .usage { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); font-style: italic; color: var(--muted); }
+  #name { padding-top: 8px; }
+
   section { padding: 48px 0; }
   h2 { font-size: 28px; margin: 0 0 20px; letter-spacing: -0.01em; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
@@ -172,6 +193,32 @@
       <p class="caption" id="caption" aria-live="polite"></p>
     </div>
   </div>
+
+  <section id="name" aria-label="What the name means">
+    <div class="wrap">
+      <div class="entry">
+        <p class="head">
+          <span class="word">pol&middot;y&middot;glass</span>
+          <span class="ipa">/ˈpɒl.i.ɡlæs/</span>
+          <span class="pos">noun</span>
+        </p>
+        <h3>Etymology</h3>
+        <p>A double entendre:</p>
+        <ul>
+          <li><strong><em>Poly-</em></strong> as in <em>polyglot</em>, from Greek <em>polýglōttos</em>, &ldquo;many-tongued.&rdquo; It speaks many languages.</li>
+          <li><strong><em>Polly</em></strong>, as in the parrot. Parrots repeat what they hear, and so does this, just in another language.</li>
+          <li><strong><em>-glass</em></strong>: the screen you&rsquo;re looking through.</li>
+        </ul>
+        <p class="aside"><em>Glôssa</em> (Greek, &ldquo;tongue&rdquo;) and <em>glass</em> are unrelated, but we&rsquo;ll take it.</p>
+        <h3>Definitions</h3>
+        <ol>
+          <li>A see-through pane that speaks every language on your screen.</li>
+          <li><em>(informal)</em> The parrot that reads your supplier&rsquo;s Chinese spreadsheet so you don&rsquo;t have to paste it into a website.</li>
+        </ol>
+        <p class="usage">&ldquo;Don&rsquo;t upload that report. Just polyglass it.&rdquo;</p>
+      </div>
+    </div>
+  </section>
 
   <section id="features">
     <div class="wrap">
