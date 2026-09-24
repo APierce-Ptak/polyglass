@@ -51,6 +51,7 @@ import traceback
 import ctypes
 import queue
 import re
+import subprocess
 import threading
 import time
 import tkinter as tk
@@ -103,8 +104,11 @@ SCRIPTS = {
 }
 # Languages offered in the bar's dropdowns, in menu order (same list as the setup wizard).
 LANG_ORDER = ["en", "zh", "zt", "ja", "ko", "ru", "ar", "es", "fr", "de", "pt", "it"]
-# These need a Windows OCR pack to be read; Chinese and Japanese also work through RapidOCR.
-OCR_PACK = {"ko": "Korean", "ru": "Russian", "ar": "Arabic"}
+# Windows OCR packs for a chosen From language. Korean, Russian and Arabic can't be read
+# without theirs; the Latin-script ones read their accents properly (English OCR reads the
+# rest, but turns "llegan" into "Ilegan"). Chinese and Japanese use RapidOCR instead.
+OCR_PACK = {"ko": "ko-KR", "ru": "ru-RU", "ar": "ar-SA",
+            "es": "es-ES", "fr": "fr-FR", "de": "de-DE", "pt": "pt-BR", "it": "it-IT"}
 NAMES = {"en": "English", "zh": "Chinese", "zt": "Chinese (Traditional)", "ja": "Japanese",
          "ko": "Korean", "ru": "Russian", "ar": "Arabic", "es": "Spanish", "fr": "French",
          "de": "German", "pt": "Portuguese", "it": "Italian"}
@@ -241,27 +245,30 @@ def ocr_all(bgra, w, h, rgb=None, target="en", source="auto"):
         raise RuntimeError("No Windows OCR languages installed (see README).")
 
     async def run():
-        best, best_score, latin = None, 0, None
+        # Latin script (English, Spanish, French, ...): read once, with the pack for the From
+        # language when it is installed (it knows that language's accents), else English.
+        latin_tags = [l.language_tag for l in langs if SCRIPTS.get(primary(l.language_tag)) is None]
+        latin = None
+        if latin_tags:
+            tag = next((t for t in latin_tags if primary(t) == source),
+                       next((t for t in latin_tags if primary(t) == "en"), latin_tags[0]))
+            print(f"[ocr] Latin text read with {tag}", flush=True)
+            latin = (tag, await _ocr(OcrEngine.try_create_from_language(Language(tag)), bmp))
+        best, best_score = None, 0
         for lang in langs:
             tag = lang.language_tag
-            p = primary(tag)
-            engine = OcrEngine.try_create_from_language(Language(tag))
-            if engine is None or p == "en":
-                if p == "en" and engine is not None and latin is None:
-                    latin = (tag, await _ocr(engine, bmp))
-                continue
-            prefixes = SCRIPTS.get(p)
-            if prefixes and family(argos_code(tag)) == family(target):
+            prefixes = SCRIPTS.get(primary(tag))
+            if prefixes is None or (source != "auto" and SCRIPTS.get(family(source)) is None):
+                continue                               # Latin, or a Latin From: nothing to add
+            if family(argos_code(tag)) == family(target):
                 continue                               # already in the output language
-            if prefixes and source != "auto" and family(argos_code(tag)) != family(source):
+            if source != "auto" and family(argos_code(tag)) != family(source):
                 continue                               # not the language picked in From
-            lines = await _ocr(engine, bmp)
-            if prefixes is None:                       # Latin-script language pack
-                if latin is None:
-                    latin = (tag, lines)
+            engine = OcrEngine.try_create_from_language(Language(tag))
+            if engine is None:
                 continue
             kept, score = [], 0
-            for text, rect in lines:
+            for text, rect in await _ocr(engine, bmp):
                 n = script_chars(text, prefixes)
                 if n and n / max(1, len(text.replace(" ", ""))) >= MIN_SCRIPT_FRACTION:
                     kept.append((text, rect))
@@ -397,6 +404,7 @@ class Overlay:
         self.start_hotkeys()
         self.build_bar()
         self.show_status(f"Ready: press Ctrl+Alt+T to translate into {name(self.target)}", 6000)
+        self.root.after(6000, self.offer_ocr_pack)
         self.root.after(50, self.pump)
         threading.Thread(target=self.live_loop, daemon=True).start()
 
@@ -501,9 +509,34 @@ class Overlay:
         self.layout_langs()
         src = "Detect language" if source == "auto" else name(source)
         self.show_status(f"Now translating {src} -> {name(target)}", 2500)
-        if source in OCR_PACK and not self.has_ocr_pack(source):
-            self.show_status(f"To read {OCR_PACK[source]}, add its Windows text-recognition pack "
-                             "(run Install.bat, or Settings > Time & Language > Language)", 7000)
+        self.offer_ocr_pack()
+
+    def offer_ocr_pack(self):
+        """If From needs a Windows OCR pack that isn't installed, offer it in the bar."""
+        code = self.source
+        if code in OCR_PACK and not self.has_ocr_pack(code):
+            why = "so accents read correctly" if SCRIPTS.get(code) is None else "to read it"
+            self.show_status(f"Add Windows text recognition for {name(code)} {why}: click here",
+                             15000, action=lambda: self.add_ocr_pack(code))
+
+    def add_ocr_pack(self, code):
+        """Add the Windows OCR pack for `code` (one UAC prompt), the same way setup does."""
+        if self.working:
+            return
+
+        def install():
+            self.working = True
+            self.jobs.put(("status", f"Adding {name(code)} text recognition (Windows will ask permission)..."))
+            try:
+                from setup_wizard import NO_WINDOW, ocr_pack_command
+                subprocess.run(ocr_pack_command([OCR_PACK[code]]), creationflags=NO_WINDOW)
+                ok = self.has_ocr_pack(code)
+                self.jobs.put(("status", f"{name(code)} text recognition added" if ok else
+                               f"{name(code)} text recognition was not added (permission declined?)"))
+            finally:
+                self.working = False
+
+        threading.Thread(target=install, daemon=True).start()
 
     @staticmethod
     def has_ocr_pack(code):
@@ -612,6 +645,10 @@ class Overlay:
         self.chip_font = tkfont.Font(family="Segoe UI", size=10, weight="bold")
         self.msg_font = tkfont.Font(family="Segoe UI", size=9)
         self.msg_id = c.create_text(bw - 16, cy, anchor="e", fill="#8b93a7", text=HINT, font=self.msg_font)
+        c.tag_bind(self.msg_id, "<Button-1>", lambda e: self.msg_click())
+        c.tag_bind(self.msg_id, "<Enter>", lambda e: c.config(cursor="hand2" if self.msg_live_action() else ""))
+        c.tag_bind(self.msg_id, "<Leave>", lambda e: c.config(cursor=""))
+        self.msg_action = None
         self.msg = ""
         self.msg_until = 0.0
         self.angle = 0
@@ -650,7 +687,7 @@ class Overlay:
         c = self.bar_canvas
         c.itemconfigure(self.state_id, text="Polyglass  •  " + ("LIVE" if self.live else "Ready"))
         if self.msg and now < self.msg_until:
-            text, color = self.msg, "#f5f5f5"
+            text, color = self.msg, "#4fc3f7" if self.msg_action else "#f5f5f5"
         else:
             text, color = HINT, "#8b93a7"
         room = int(c.winfo_width()) - 16 - self.langs_end - 12
@@ -668,11 +705,22 @@ class Overlay:
             c.itemconfigure(self.dot, state="normal", fill="#ffb300" if self.live else "#3ddc84")
         self.root.after(50, self.tick)
 
-    def show_status(self, msg, ms):
+    def show_status(self, msg, ms, action=None):
+        """Show `msg` in the bar for `ms`; with `action`, clicking the message runs it."""
         print(f"[status] {msg}", flush=True)
         if hasattr(self, "msg_id"):
             self.msg = msg
             self.msg_until = time.time() + ms / 1000.0
+            self.msg_action = action
+
+    def msg_live_action(self):
+        return self.msg_action if self.msg and time.time() < self.msg_until else None
+
+    def msg_click(self):
+        action = self.msg_live_action()
+        if action:
+            self.msg_until = 0
+            action()
 
     def wrap(self, text, font, width):
         # Chinese and Japanese have no spaces, so wrap those by character.

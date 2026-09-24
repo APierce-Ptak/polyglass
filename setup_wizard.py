@@ -26,7 +26,8 @@ ICON = os.path.join(APP_DIR, "polyglass.ico")
 OCR_ADDED = os.path.join(APP_DIR, "ocr_added.txt")   # read by Uninstall.bat
 NO_WINDOW = 0x08000000
 
-# (label, Windows OCR pack tag or None when the built-in Latin OCR covers it, Argos code)
+# (label, Windows OCR pack tag, Argos code). English OCR ships with Windows. Latin-script packs
+# are only added for a chosen From/To (they read that language's accents); English reads the rest.
 LANGUAGES = [
     ("English", None, "en"),
     ("Chinese (Simplified)", "zh-CN", "zh"),
@@ -35,16 +36,39 @@ LANGUAGES = [
     ("Korean", "ko-KR", "ko"),
     ("Russian", "ru-RU", "ru"),
     ("Arabic", "ar-SA", "ar"),
-    ("Spanish", None, "es"),
-    ("French", None, "fr"),
-    ("German", None, "de"),
-    ("Portuguese", None, "pt"),
-    ("Italian", None, "it"),
+    ("Spanish", "es-ES", "es"),
+    ("French", "fr-FR", "fr"),
+    ("German", "de-DE", "de"),
+    ("Portuguese", "pt-BR", "pt"),
+    ("Italian", "it-IT", "it"),
 ]
+LATIN = {"es", "fr", "de", "pt", "it"}
 DETECT = "Detect language"
 LABEL = {c: l for l, _, c in LANGUAGES}
 CODE = {l: c for l, _, c in LANGUAGES}
 TAG = {c: t for _, t, c in LANGUAGES}
+
+
+def ocr_pack_command(tags):
+    """Command that adds Windows OCR packs for `tags` (e.g. ["es-ES"]) behind one UAC prompt.
+    Records only the packs it actually adds, so Uninstall.bat never removes ones Windows (or
+    the user) already had. The app uses this too, to add a pack from its language bar."""
+    quoted = ",".join(f"'{t}'" for t in tags)
+    script = os.path.join(os.environ.get("TEMP", APP_DIR), "polyglass_add_ocr.ps1")
+    with open(script, "w", encoding="utf-8-sig") as f:
+        f.write(
+            f"$added = '{OCR_ADDED.replace(chr(39), chr(39) * 2)}'\n"
+            f"foreach ($t in @({quoted})) {{\n"
+            "  $n = \"Language.OCR~~~$t~~~0.0.1.0\"\n"
+            "  if ((Get-WindowsCapability -Online -Name $n).State -ne 'Installed') {\n"
+            "    Add-WindowsCapability -Online -Name $n | Out-Null\n"
+            "    Add-Content -LiteralPath $added -Value $n\n"
+            "  }\n"
+            "}\n")
+    ps = ("Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden "
+          f"-ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"{script}\"'")
+    return ["powershell", "-NoProfile", "-Command", ps]
+
 
 BG, FG, ACCENT, MUTED = "#15171c", "#f2f3f5", "#4fc3f7", "#8b93a7"
 
@@ -299,7 +323,7 @@ class Wizard(tk.Tk):
         dst = CODE[self.dst.get()]
         self.save_config(src, dst)
         # Text-recognition packs: every script when detecting, otherwise both sides so swapping works.
-        wanted = [c for _, _, c in LANGUAGES] if src == "auto" else [src, dst]
+        wanted = [c for _, _, c in LANGUAGES if c not in LATIN] if src == "auto" else [src, dst]
         langs = [(LABEL[c], TAG[c], c) for c in wanted if TAG[c]]
         # Models: both directions, going through English where needed (the app does the same).
         pairs = []
@@ -323,24 +347,8 @@ class Wizard(tk.Tk):
 
         self.step("Adding Windows OCR language packs", 55)
         if langs:
-            # Runs elevated. Records only the packs it actually adds, so Uninstall.bat
-            # never removes ones Windows (or the user) already had.
-            tags = ",".join(f"'{tag}'" for _, tag, _ in langs)
-            script = os.path.join(os.environ.get("TEMP", APP_DIR), "polyglass_add_ocr.ps1")
-            with open(script, "w", encoding="utf-8-sig") as f:
-                f.write(
-                    f"$added = '{OCR_ADDED.replace(chr(39), chr(39) * 2)}'\n"
-                    f"foreach ($t in @({tags})) {{\n"
-                    "  $n = \"Language.OCR~~~$t~~~0.0.1.0\"\n"
-                    "  if ((Get-WindowsCapability -Online -Name $n).State -ne 'Installed') {\n"
-                    "    Add-WindowsCapability -Online -Name $n | Out-Null\n"
-                    "    Add-Content -LiteralPath $added -Value $n\n"
-                    "  }\n"
-                    "}\n")
-            ps = ("Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden "
-                  f"-ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"{script}\"'")
             self.say("Windows will ask permission to add: " + ", ".join(l for l, _, _ in langs))
-            if self.run(["powershell", "-NoProfile", "-Command", ps]) != 0:
+            if self.run(ocr_pack_command([tag for _, tag, _ in langs])) != 0:
                 self.say("Permission was declined; OCR packs were skipped. (Chinese and Japanese still work without them.)")
         self.run([VPY, "-c",
                   "from winsdk.windows.media.ocr import OcrEngine;"
