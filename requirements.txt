@@ -1,7 +1,6 @@
 mss
 pillow
 numpy
-pynput
 winsdk
 argostranslate
 langdetect

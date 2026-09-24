@@ -11,10 +11,15 @@ Hotkeys
     Ctrl+Alt+C   clear the overlay
     Ctrl+Alt+Q   quit
 
-Settings live in polyglass.json next to this file (the setup wizard writes it):
+Click the languages in the bar at the top to change them, like Google Translate:
+installed ones show a check, others download when you pick them.
+
+Settings live in polyglass.json next to this file (the setup wizard and the bar write it):
     "from"   the language on screen, or "auto" to detect it (e.g. "ja", "auto")
     "to"     the language to translate into (e.g. "en", "es")
-The language on screen is always detected; "from" is what Ctrl+Alt+D swaps in.
+    "monitor"  optional: which screen to cover, 1 = the first, 2 = the second, ...
+               (leave it out for the main screen)
+With "from" set to a language, the screen is read as that language; with "auto" it is detected.
 
 How it works
     1. mss grabs the primary monitor.
@@ -51,6 +56,7 @@ import time
 import tkinter as tk
 import tkinter.font as tkfont
 import unicodedata
+from ctypes import wintypes
 
 if sys.platform != "win32":
     sys.exit("Polyglass only runs on Windows.")
@@ -64,8 +70,10 @@ except Exception:
 import mss
 import numpy as np
 from PIL import Image
-from pynput import keyboard
 
+# Run models in the precision they were saved in. Argos's default ("auto") picks int8 on
+# most CPUs, which turns the Spanish -> English model's output into "mainstremainstre...".
+os.environ.setdefault("ARGOS_COMPUTE_TYPE", "default")
 import argostranslate.package
 import argostranslate.translate
 from winsdk.windows.globalization import Language
@@ -93,6 +101,10 @@ SCRIPTS = {
     "sr": ("CYRILLIC",), "ar": ("ARABIC",), "fa": ("ARABIC",),
     "he": ("HEBREW",), "th": ("THAI",), "el": ("GREEK",), "hi": ("DEVANAGARI",),
 }
+# Languages offered in the bar's dropdowns, in menu order (same list as the setup wizard).
+LANG_ORDER = ["en", "zh", "zt", "ja", "ko", "ru", "ar", "es", "fr", "de", "pt", "it"]
+# These need a Windows OCR pack to be read; Chinese and Japanese also work through RapidOCR.
+OCR_PACK = {"ko": "Korean", "ru": "Russian", "ar": "Arabic"}
 NAMES = {"en": "English", "zh": "Chinese", "zt": "Chinese (Traditional)", "ja": "Japanese",
          "ko": "Korean", "ru": "Russian", "ar": "Arabic", "es": "Spanish", "fr": "French",
          "de": "German", "pt": "Portuguese", "it": "Italian"}
@@ -210,14 +222,18 @@ def rapid_ocr(rgb):
     return ("ja" if kana else "zh"), lines
 
 
-def ocr_all(bgra, w, h, rgb=None, target="en"):
-    """Return (argos_from_code, [(text, rect), ...]) for the best language that is not
-    already `target`, or (None, [])."""
-    if rgb is not None:
+def ocr_all(bgra, w, h, rgb=None, target="en", source="auto"):
+    """Return (argos_from_code, [(text, rect), ...]) for the text to translate, or (None, []).
+    With a `source` language only that language is read; with "auto" the best language that
+    is not already `target` wins."""
+    cjk = source in ("zh", "zt", "ja")
+    if rgb is not None and (source == "auto" or cjk):
         code, lines = rapid_ocr(rgb)
         print(f"[ocr] RapidOCR: {len(lines)} CJK lines", flush=True)
-        if lines and family(code) != family(target):
-            return code, lines
+        # When detecting, a lone character (a tray icon, a logo) is not enough to win.
+        enough = cjk or sum(len(t.replace(" ", "")) for t, _ in lines) >= 2
+        if lines and enough and family(code) != family(target):
+            return (source if cjk else code), lines
     bmp = make_bitmap(bgra, w, h)
     langs = list(OcrEngine.available_recognizer_languages)
     print("[ocr] installed OCR languages:", [l.language_tag for l in langs], flush=True)
@@ -237,6 +253,8 @@ def ocr_all(bgra, w, h, rgb=None, target="en"):
             prefixes = SCRIPTS.get(p)
             if prefixes and family(argos_code(tag)) == family(target):
                 continue                               # already in the output language
+            if prefixes and source != "auto" and family(argos_code(tag)) != family(source):
+                continue                               # not the language picked in From
             lines = await _ocr(engine, bmp)
             if prefixes is None:                       # Latin-script language pack
                 if latin is None:
@@ -252,6 +270,9 @@ def ocr_all(bgra, w, h, rgb=None, target="en"):
                 best, best_score = (argos_code(tag), kept), score
         if best and best_score >= 2:
             return best
+        if source != "auto":
+            # A Latin-script From (Spanish, French, ...): read the screen as that language.
+            return (source, latin[1]) if latin and SCRIPTS.get(source) is None and not cjk else (None, [])
         # Latin-script fallback: detect the language of the whole screen.
         if latin and detect_langs:
             joined = " ".join(t for t, _ in latin[1])
@@ -275,10 +296,24 @@ class Translator:
         self.unavailable = set()
 
     @staticmethod
-    def installed(src, dst):
-        langs = {l.code: l for l in argostranslate.translate.get_installed_languages()}
+    def installed_languages():
+        return {l.code: l for l in argostranslate.translate.get_installed_languages()}
+
+    @staticmethod
+    def installed(src, dst, langs=None):
+        langs = langs or Translator.installed_languages()
         # get_translation also finds a route through English (e.g. ja -> en -> es).
         return src in langs and dst in langs and bool(langs[src].get_translation(langs[dst]))
+
+    @staticmethod
+    def ready(src, dst, langs):
+        """True when src -> dst can be translated offline right now (Traditional Chinese
+        can fall back to the Simplified models, like ensure() does)."""
+        if src == dst:
+            return True
+        return any(Translator.installed(a, b, langs)
+                   for a in ({src, "zh"} if src == "zt" else {src})
+                   for b in ({dst, "zh"} if dst == "zt" else {dst}))
 
     def ensure(self, code, target):
         """Make sure an offline route code -> target exists, downloading models if needed.
@@ -295,9 +330,9 @@ class Translator:
             direct = find(code, target)
             # No direct model: go through English, e.g. ja -> en -> es.
             route = [direct] if direct else [find(code, "en"), find("en", target)]
-            if None in route and code == "zt":
+            if any(p is None for p in route) and code == "zt":
                 return self.ensure("zh", target)
-            if None in route:
+            if any(p is None for p in route):     # not "None in route": Package.__eq__ breaks on None
                 self.unavailable.add((code, target))
                 self.status(f"No offline model for {name(code)} -> {name(target)}.")
                 return None
@@ -342,7 +377,10 @@ class Overlay:
             self.source = "auto"
 
         with mss.MSS() as sct:
-            mon = sct.monitors[1]
+            screens = sct.monitors[1:]
+        pick = self.config.get("monitor")
+        mon = (screens[pick - 1] if isinstance(pick, int) and 1 <= pick <= len(screens)
+               else next((m for m in screens if m.get("is_primary")), screens[0]))
         self.mon = mon
         r = self.root
         r.overrideredirect(True)
@@ -355,23 +393,36 @@ class Overlay:
         r.update()
         self.exclude_from_capture = self._make_clickthrough()
 
-        keys = {
-            "<ctrl>+<alt>+t": lambda: self.cmds.put("once"),
-            "<ctrl>+<alt>+l": lambda: self.cmds.put("live"),
-            "<ctrl>+<alt>+d": lambda: self.cmds.put("swap"),
-            "<ctrl>+<alt>+c": lambda: self.cmds.put("clear"),
-            "<ctrl>+<alt>+q": lambda: self.cmds.put("quit"),
-        }
-        keyboard.GlobalHotKeys(keys).start()
+        self.downloading = False
+        self.start_hotkeys()
         self.build_bar()
         self.show_status(f"Ready: press Ctrl+Alt+T to translate into {name(self.target)}", 6000)
         self.root.after(50, self.pump)
         threading.Thread(target=self.live_loop, daemon=True).start()
 
+    def start_hotkeys(self):
+        """Global Ctrl+Alt hotkeys through Windows' own RegisterHotKey. (pynput's hotkey
+        matcher never fires for Ctrl+Alt+letter on Windows, because the letter arrives
+        without its character while Ctrl and Alt are held.)"""
+        keys = {"T": "once", "L": "live", "D": "swap", "C": "clear", "Q": "quit"}
+
+        def loop():
+            u = ctypes.windll.user32
+            taken = [f"Ctrl+Alt+{k}" for i, k in enumerate(keys, 1)
+                     if not u.RegisterHotKey(None, i, 0x0001 | 0x0002 | 0x4000, ord(k))]  # ALT|CONTROL|NOREPEAT
+            if taken:
+                self.jobs.put(("status", f"Another app is already using {', '.join(taken)}"))
+            cmds = list(keys.values())
+            msg = wintypes.MSG()
+            while u.GetMessageW(ctypes.byref(msg), None, 0, 0) > 0:
+                if msg.message == 0x0312:                                  # WM_HOTKEY
+                    self.cmds.put(cmds[msg.wParam - 1])
+
+        threading.Thread(target=loop, daemon=True).start()
+
     # -- window setup --------------------------------------------------------
     def _make_clickthrough(self):
         import os
-        from ctypes import wintypes
         u = ctypes.windll.user32
         hwnd = u.GetParent(self.root.winfo_id()) or self.root.winfo_id()
         GWL_EXSTYLE = -20
@@ -421,6 +472,8 @@ class Overlay:
                     self.show_status(payload, 3000)
                 elif kind == "draw":
                     self.draw(payload)
+                elif kind == "langs":
+                    self.set_languages(*payload)
                 elif kind == "hide":
                     self.canvas.itemconfigure("tr", state="hidden")
                     self.canvas.update_idletasks()
@@ -432,58 +485,180 @@ class Overlay:
         self.root.after(50, self.pump)
 
     def swap_languages(self):
-        """Ctrl+Alt+D: the same as the swap button next to From / To in setup."""
+        """Ctrl+Alt+D and the bar's swap button, like the swap button in setup."""
         if self.source == "auto":
-            self.show_status("From is set to Detect: pick a From language in setup (Install.bat) to swap", 5000)
+            self.show_status("From is on Detect: click it and pick a language to swap", 4000)
             return
-        self.source, self.target = self.target, self.source
-        self.config.update({"from": self.source, "to": self.target})
+        self.pick("from", self.target)
+
+    def set_languages(self, source, target):
+        self.source, self.target = source, target
+        self.config.update({"from": source, "to": target})
         save_config(self.config)
         self.canvas.delete("tr")
         self.last_thumb = None                  # make live mode rescan right away
         self.regions, self.region_sigs = [], []
-        self.show_status(f"Now translating {name(self.source)} -> {name(self.target)}", 2500)
+        self.layout_langs()
+        src = "Detect language" if source == "auto" else name(source)
+        self.show_status(f"Now translating {src} -> {name(target)}", 2500)
+        if source in OCR_PACK and not self.has_ocr_pack(source):
+            self.show_status(f"To read {OCR_PACK[source]}, add its Windows text-recognition pack "
+                             "(run Install.bat, or Settings > Time & Language > Language)", 7000)
 
-    def direction_label(self):
-        src = "AUTO" if self.source == "auto" else self.source.upper()
-        return f"{src} → {self.target.upper()}"
+    @staticmethod
+    def has_ocr_pack(code):
+        return any(primary(l.language_tag) == code for l in OcrEngine.available_recognizer_languages)
+
+    @staticmethod
+    def routes(source, target):
+        """Model routes to have for a language pair: both ways, so swapping works too."""
+        if source == "auto":
+            return [] if target == "en" else [("en", target)]
+        return [(source, target), (target, source)]
+
+    def next_pair(self, side, code):
+        """The (from, to) pair after picking `code` on one side. Picking the language that is
+        already on the other side swaps them, like Google Translate."""
+        src, dst = self.source, self.target
+        if side == "to":
+            return (src, code) if code != src else (dst, code)
+        if code != dst:
+            return code, dst
+        return code, src if src != "auto" else ("es" if code == "en" else "en")
+
+    def pick(self, side, code):
+        """Choose a From or To language from the bar; missing models download first."""
+        if self.downloading:
+            self.show_status("Still downloading, one moment...", 2000)
+            return
+        new = self.next_pair(side, code)
+        if new == (self.source, self.target):
+            return
+        langs = Translator.installed_languages()
+        missing = [r for r in self.routes(*new) if not Translator.ready(*r, langs)]
+        if not missing:
+            self.set_languages(*new)
+            return
+
+        def download():
+            self.downloading = self.working = True
+            codes = dict.fromkeys(c for r in missing for c in r if c != "en")
+            self.jobs.put(("status", f"Downloading {' and '.join(map(name, codes)) or 'English'} "
+                                     "(first time only)..."))
+            try:
+                if all(self.translator.ensure(a, b) for a, b in missing):
+                    self.jobs.put(("langs", new))
+            finally:
+                self.downloading = self.working = False
+
+        threading.Thread(target=download, daemon=True).start()
+
+    def open_menu(self, side):
+        """Dropdown for the From or To button: a check when a language is ready to use
+        offline, "Download" when its models still need downloading."""
+        if self.downloading:
+            self.show_status("Still downloading, one moment...", 2000)
+            return
+        langs = Translator.installed_languages()
+        current = self.source if side == "from" else self.target
+        m = tk.Menu(self.bar, tearoff=0, font=("Segoe UI", 10), bg="#1b1d23", fg="#f2f3f5",
+                    activebackground="#2d3340", activeforeground="#ffffff", bd=0)
+        self.menu_choice = tk.StringVar(value=current)
+        if side == "from":
+            m.add_radiobutton(label="Detect language", variable=self.menu_choice, value="auto",
+                              command=lambda: self.pick("from", "auto"))
+            m.add_separator()
+        for code in LANG_ORDER:
+            ok = all(Translator.ready(*r, langs) for r in self.routes(*self.next_pair(side, code)))
+            m.add_radiobutton(label=name(code), variable=self.menu_choice, value=code,
+                              accelerator="✓" if ok else "⬇ Download",
+                              command=lambda c=code: self.pick(side, c))
+        x0, _, _, y1 = self.bar_canvas.bbox(f"{side}_chip")
+        m.tk_popup(self.bar.winfo_rootx() + x0, self.bar.winfo_rooty() + y1 + 4)
 
     # -- persistent top bar ---------------------------------------------------
     def build_bar(self):
+        """A small clickable window above the click-through overlay: status, the From / To
+        language buttons with a swap button between them, and the hotkey hint."""
         W = self.mon["width"]
-        bw, bh, y0 = 760, 40, 8
+        bw, bh, y0 = 960, 40, 8
         x0 = (W - bw) // 2
-        x1, y1, r = x0 + bw, y0 + bh, 16
-        pts = [x0 + r, y0, x1 - r, y0, x1, y0, x1, y0 + r, x1, y1 - r, x1, y1,
-               x1 - r, y1, x0 + r, y1, x0, y1, x0, y1 - r, x0, y0 + r, x0, y0]
-        c = self.canvas
-        c.create_polygon(pts, smooth=True, fill="#1b1d23", outline="#3a3f4b", width=1, tags="bar")
-        cy = y0 + bh // 2
-        self.dot = c.create_oval(x0 + 16, cy - 7, x0 + 30, cy + 7, fill="#3ddc84", outline="", tags="bar")
-        self.spin = c.create_arc(x0 + 14, cy - 10, x0 + 34, cy + 10, start=0, extent=270,
-                                 style="arc", outline="#4fc3f7", width=3, tags="bar", state="hidden")
-        self.msg_id = c.create_text(x0 + 46, cy, anchor="w", text="", fill="#f5f5f5",
-                                    font=("Segoe UI", 11, "bold"), tags="bar")
-        self.hint_id = c.create_text(x1 - 16, cy, anchor="e", fill="#8b93a7",
-                                     text=HINT,
-                                     font=("Segoe UI", 9), tags="bar")
+        self.bar_rect = (x0, y0, x0 + bw, y0 + bh)      # monitor coordinates; OCR skips it
+        self.bar = b = tk.Toplevel(self.root)
+        b.overrideredirect(True)
+        b.attributes("-topmost", True)
+        b.attributes("-transparentcolor", TRANSPARENT)
+        b.config(bg=TRANSPARENT)
+        b.geometry(f"{bw}x{bh}+{self.mon['left'] + x0}+{self.mon['top'] + y0}")
+        self.bar_canvas = c = tk.Canvas(b, bg=TRANSPARENT, highlightthickness=0, bd=0)
+        c.pack(fill="both", expand=True)
+        b.update()
+        u = ctypes.windll.user32
+        hwnd = u.GetParent(b.winfo_id()) or b.winfo_id()
+        u.SetWindowLongW(hwnd, -20, u.GetWindowLongW(hwnd, -20) | 0x00000080)   # TOOLWINDOW: no taskbar button
+        if self.exclude_from_capture:
+            u.SetWindowDisplayAffinity(hwnd, 0x11)
+
+        x1, y1, r = bw - 1, bh - 1, 16
+        pts = [r, 0, x1 - r, 0, x1, 0, x1, r, x1, y1 - r, x1, y1,
+               x1 - r, y1, r, y1, 0, y1, 0, y1 - r, 0, r, 0, 0]
+        c.create_polygon(pts, smooth=True, fill="#1b1d23", outline="#3a3f4b", width=1)
+        cy = bh // 2
+        self.dot = c.create_oval(16, cy - 7, 30, cy + 7, fill="#3ddc84", outline="")
+        self.spin = c.create_arc(14, cy - 10, 34, cy + 10, start=0, extent=270,
+                                 style="arc", outline="#4fc3f7", width=3, state="hidden")
+        self.state_id = c.create_text(46, cy, anchor="w", text="", fill="#f5f5f5",
+                                      font=("Segoe UI", 11, "bold"))
+        self.chip_font = tkfont.Font(family="Segoe UI", size=10, weight="bold")
+        self.msg_font = tkfont.Font(family="Segoe UI", size=9)
+        self.msg_id = c.create_text(bw - 16, cy, anchor="e", fill="#8b93a7", text=HINT, font=self.msg_font)
         self.msg = ""
         self.msg_until = 0.0
         self.angle = 0
         self.working = False
+        self.layout_langs()
         self.tick()
+
+    def layout_langs(self):
+        """(Re)draw the [From v] swap [To v] buttons for the current languages."""
+        c = self.bar_canvas
+        c.delete("lang")
+        cy = int(c.winfo_height()) // 2
+        x = 190
+        src = "Detect language" if self.source == "auto" else name(self.source)
+        for side, label in (("from", src), ("swap", "⇄"), ("to", name(self.target))):
+            text = label if side == "swap" else f"{label}  ▾"
+            w = self.chip_font.measure(text) + (16 if side == "swap" else 24)
+            tag = f"{side}_chip"
+            off = side == "swap" and self.source == "auto"     # nothing to swap with Detect
+            c.create_rectangle(x, cy - 13, x + w, cy + 13, fill="#262a33", outline="#3a3f4b",
+                               tags=("lang", tag, f"{tag}_bg"))
+            c.create_text(x + w // 2, cy, text=text, font=self.chip_font,
+                          fill="#5d6475" if off else "#f2f3f5", tags=("lang", tag))
+            if not off:
+                c.tag_bind(tag, "<Enter>", lambda e, t=tag: (c.itemconfigure(f"{t}_bg", fill="#323846"),
+                                                             c.config(cursor="hand2")))
+                c.tag_bind(tag, "<Leave>", lambda e, t=tag: (c.itemconfigure(f"{t}_bg", fill="#262a33"),
+                                                             c.config(cursor="")))
+                action = self.swap_languages if side == "swap" else (lambda s=side: self.open_menu(s))
+                c.tag_bind(tag, "<Button-1>", lambda e, a=action: a())
+            x += w + 8
+        self.langs_end = x
 
     def tick(self):
         now = time.time()
-        c = self.canvas
+        c = self.bar_canvas
+        c.itemconfigure(self.state_id, text="Polyglass  •  " + ("LIVE" if self.live else "Ready"))
         if self.msg and now < self.msg_until:
-            text, hint = self.msg, ""
+            text, color = self.msg, "#f5f5f5"
         else:
-            text = ("Polyglass  \u2022  " + ("LIVE" if self.live else "Ready")
-                    + f"  \u2022  {self.direction_label()}")
-            hint = HINT
-        c.itemconfigure(self.msg_id, text=text)
-        c.itemconfigure(self.hint_id, text=hint)
+            text, color = HINT, "#8b93a7"
+        room = int(c.winfo_width()) - 16 - self.langs_end - 12
+        if self.msg_font.measure(text) > room:
+            while text and self.msg_font.measure(text + "…") > room:
+                text = text[:-1]
+            text += "…"
+        c.itemconfigure(self.msg_id, text=text, fill=color)
         if self.working:
             self.angle = (self.angle - 25) % 360
             c.itemconfigure(self.spin, state="normal", start=self.angle)
@@ -491,7 +666,6 @@ class Overlay:
         else:
             c.itemconfigure(self.spin, state="hidden")
             c.itemconfigure(self.dot, state="normal", fill="#ffb300" if self.live else "#3ddc84")
-        c.tag_raise("bar")
         self.root.after(50, self.tick)
 
     def show_status(self, msg, ms):
@@ -578,7 +752,7 @@ class Overlay:
 
     def work(self, force):
         hidden = False
-        target = self.target
+        source, target = self.source, self.target
         try:
             with mss.MSS() as sct:
                 shot = sct.grab(self.mon)
@@ -602,8 +776,11 @@ class Overlay:
                 img = Image.frombytes("RGB", shot.size, shot.bgra, "raw", "BGRX")
             w, h = shot.size
             print(f"[capture] {w}x{h}, mean brightness {np.asarray(img).mean():.0f}", flush=True)
-            code, lines = ocr_all(shot.bgra, w, h, np.asarray(img), target)
+            code, lines = ocr_all(shot.bgra, w, h, np.asarray(img), target, source)
             print(f"[ocr] source language={code}, target={target}, lines found={len(lines)}", flush=True)
+            bx0, by0, bx1, by1 = self.bar_rect
+            lines = [(t, r) for t, r in lines
+                     if not (r[0] < bx1 and r[0] + r[2] > bx0 and r[1] < by1 and r[1] + r[3] > by0)]
             self.regions = [r for _, r in lines]
             self.region_sigs = [self.sig(img, r) for r in self.regions]
             for t, r in lines[:5]:

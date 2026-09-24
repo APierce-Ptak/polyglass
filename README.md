@@ -13,11 +13,11 @@
 
 A transparent, click-through overlay for Windows that reads the text on your screen and draws the translation, in the language you choose, **in the same spot**, right over the original. It works on games, videos, apps, and web pages.
 
-- **Any language to any language.** Pick *From* and *To* in setup, like Google Translate, or leave *From* on *Detect language*. Ctrl+Alt+D swaps them, like the ⇄ button.
+- **Any language to any language.** Pick *From* and *To* in the bar at the top of the screen, like Google Translate, or leave *From* on *Detect language*. Installed languages show ✓; others show ⬇ Download and download when you pick them. The ⇄ button (or Ctrl+Alt+D) swaps them.
 - Supports Chinese, Japanese, Korean, Russian, Arabic, and Latin-script languages (Spanish, French, German, and others). Between two non-English languages (for example Japanese → Spanish), it translates through English.
 - Fully offline: OCR and translation both run on your PC.
 - Live mode re-translates only when the text on screen actually changes, so it doesn't waste CPU.
-- Always-on status bar at the top of the screen, with a loading spinner while it works.
+- Always-on bar at the top of the screen with the language pickers and a loading spinner while it works.
 - Click-through: you keep using your game or app normally.
 
 ## Install
@@ -40,7 +40,9 @@ Start **Polyglass** from the desktop shortcut (or `Run.bat`), click the window w
 | Ctrl+Alt+C | Clear the overlay |
 | Ctrl+Alt+Q | Quit |
 
-The status bar shows the current languages (for example `JA → EN`, or `AUTO → EN` when detecting). Text that is already in the output language is left alone.
+Click the languages in the bar to change them. With a *From* language picked, the screen is read as that language; with *Detect language*, it works out the language itself and leaves text that is already in the output language alone.
+
+To use a screen other than the main one, add `"monitor": 2` (or 3, ...) to `polyglass.json` in the app folder.
 
 The first translation after each launch takes several seconds while the models load. After that it takes 1-3 seconds.
 
@@ -59,7 +61,7 @@ Run `Debug.bat` to see a console with what the app is doing. It prints the insta
 
 - **Says only `en-US` is installed:** re-run `Install.bat` and tick the language, then accept the Windows permission prompt.
 - **Nothing appears over a game:** switch the game to windowed or borderless.
-- **Ctrl+Alt+D won't swap:** *From* is set to *Detect language*, so there's nothing to swap with. Re-run `Install.bat` and pick a *From* language, or set `"from"` and `"to"` (for example `"ja"` and `"en"`) in `polyglass.json` in the app folder.
+- **Ctrl+Alt+D won't swap:** *From* is set to *Detect language*, so there's nothing to swap with. Click *From* in the bar and pick a language.
 - **Wrong or odd translations:** offline models are good but not perfect. Text is translated line by line.
 
 ## Manual install
