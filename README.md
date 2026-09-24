@@ -4,8 +4,7 @@
 
 <h1 align="center">Polyglass</h1>
 
-<p align="center"><em>Any language</em></p>
-<p align="center"><em>Any place</em></p>
+<p align="center"><em>Any Language. Any Place.</em></p>
 
 <p align="center"><a href="https://github.com/APierce-Ptak/polyglass/actions/workflows/tests.yml"><img src="https://github.com/APierce-Ptak/polyglass/actions/workflows/tests.yml/badge.svg" alt="Tests"></a></p>
 
