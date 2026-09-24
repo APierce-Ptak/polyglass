@@ -2,6 +2,10 @@
 
 Stable releases of Polyglass. Download the latest from the [Releases page](https://github.com/APierce-Ptak/polyglass/releases/latest).
 
+## 0.3.4 (2026-09-24)
+
+- **Better Japanese translations of short text.** The models were allowed to output "unknown word", which Polyglass then blanked out: いいえ came back untranslated, セーブ ("Save") as "ブ", and 勇者よ、よくぞ来た！ as "I'm a !". Now they always pick a real word. On a 75-line test of menu, game, subtitle and document text, Japanese scored 67 instead of 60 (chrF); Chinese and Spanish were unchanged.
+
 ## 0.3.3 (2026-09-24)
 
 - **`polyglass.log` starts fresh each launch.** It records the text Polyglass reads off the screen, and it used to keep everything from every session, growing without limit in live mode. Now it only holds the current session.
