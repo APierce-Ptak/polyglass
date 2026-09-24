@@ -24,15 +24,15 @@ jobs:
           python -m pip install --no-deps (python -c "import setup_wizard; print(setup_wizard.ARGOS)")
 
       # A few real models so the translation tests run instead of skipping:
-      # es -> en (the model int8 used to garble), en -> es, fr -> en for a route through English, zh -> en.
+      # es -> en (the model int8 used to garble), en -> es, fr -> en for a route through English, zh -> en, ja -> en.
       - uses: actions/cache@v6
         with:
           path: ~\.local\share\argos-translate\packages
-          key: models-es-en-fr-zh-v1
+          key: models-es-en-fr-zh-ja-v1
 
       - name: Download translation models (first run only)
         run: |
-          python -c "import polyglass; t = polyglass.Translator(print); assert all(t.ensure(a, b) for a, b in [('es', 'en'), ('en', 'es'), ('fr', 'en'), ('zh', 'en')])"
+          python -c "import polyglass; t = polyglass.Translator(print); assert all(t.ensure(a, b) for a, b in [('es', 'en'), ('en', 'es'), ('fr', 'en'), ('zh', 'en'), ('ja', 'en')])"
 
       - name: Run tests
         run: python -m unittest -v

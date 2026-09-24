@@ -274,6 +274,11 @@ class Translation(unittest.TestCase):
     def test_chinese_to_english(self):
         self.check("zh", "en", "净利润增长了两倍。", "tripled")
 
+    def test_japanese_short_labels(self):
+        # With unknown words allowed, いいえ came back untranslated and セーブ as "ブ".
+        self.check("ja", "en", "いいえ", "No")
+        self.assertEqual(self.t.translate("ja", "en", "セーブ").lower(), "save")
+
     def test_through_english(self):
         self.check("fr", "es", "Bienvenue dans notre boutique en ligne.", "tienda")
 

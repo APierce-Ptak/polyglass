@@ -388,8 +388,10 @@ class Translator:
             # on most CPUs) turns the Spanish -> English model's output into "mainstremainstre...".
             self.engines[path] = ctranslate2.Translator(path, device="cpu", compute_type="default")
         prefix = [[pkg.target_prefix]] if pkg.target_prefix else None
+        # disable_unk: never output "unknown word". With it allowed, the Japanese model
+        # keeps いいえ untranslated and turns 勇者よ、よくぞ来た！ into "I'm a !".
         result = self.engines[path].translate_batch(
-            [pkg.tokenizer.encode(text)], target_prefix=prefix, replace_unknowns=True,
+            [pkg.tokenizer.encode(text)], target_prefix=prefix, disable_unk=True,
             beam_size=4, length_penalty=0.2)
         out = pkg.tokenizer.decode(result[0].hypotheses[0])
         if pkg.target_prefix and out.startswith(pkg.target_prefix):
