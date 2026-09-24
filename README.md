@@ -4,7 +4,8 @@
 
 <h1 align="center">Polyglass</h1>
 
-<p align="center"><em> Any language. Any place.</em></p>
+<p align="center"><em>Any language</em></p>
+<p align="center"><em>Any place</em></p>
 
 <p align="center">
   <a href="https://apierce-ptak.github.io/polyglass/"><strong>Website</strong></a> ·
