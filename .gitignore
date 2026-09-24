@@ -4,3 +4,7 @@ __pycache__/
 *.log
 polyglass.json
 ocr_added.txt
+
+node_modules/
+promo/*.mp4
+promo/still_*.png

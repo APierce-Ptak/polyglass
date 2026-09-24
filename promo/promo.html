@@ -1,0 +1,259 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@600;700;800;900&display=block" rel="stylesheet">
+<style>
+  :root {
+    --paper: #f4f8f9; --ink: #16323a; --muted: #5b7479;
+    --teal: #2ca7b8; --teal-dark: #1c7f8d; --glass: #c6ecf5;
+    --red: #e5392f; --yellow: #ffcd2e; --blue: #2272d6;
+  }
+  html, body { margin: 0; overflow: hidden; background: var(--paper); }
+  body { font-family: "Nunito", "Segoe UI", sans-serif; color: var(--ink); position: relative; }
+
+  .screen { position: absolute; left: 0; top: 0; width: 540px; height: 340px; transform-origin: 0 0;
+            border-radius: 16px; overflow: hidden; background: #fff; }
+  .content { position: absolute; inset: 0; }
+  .glass { position: absolute; inset: 0; opacity: 0;
+           background: linear-gradient(135deg, transparent 0 38%, rgba(255,255,255,.7) 38% 45%, transparent 45% 55%, rgba(255,255,255,.7) 55% 60%, transparent 60%), var(--glass); }
+  .rim { position: absolute; inset: 0; border: 16px solid var(--teal); border-radius: 16px; opacity: 0; }
+  /* the pane that slides across and leaves English behind */
+  .pane { position: absolute; top: -20px; width: 110px; height: 380px; opacity: 0;
+          background: linear-gradient(135deg, transparent 0 40%, rgba(255,255,255,.75) 40% 52%, transparent 52%), rgba(198,236,245,.72);
+          border-left: 6px solid var(--teal); border-right: 6px solid var(--teal); transform: skewX(-10deg); }
+  .label { position: absolute; width: 540px; text-align: center; font-size: 26px; font-weight: 800; }
+  .label span { font-weight: 700; color: var(--muted); }
+  .label i { display: inline-block; width: 14px; height: 14px; border-radius: 4px; margin-right: 10px; vertical-align: 1px; }
+  .tr { position: absolute; white-space: nowrap; }
+  .jp { font-family: "Yu Gothic UI", "Meiryo", sans-serif; font-weight: 700; }
+  .zh { font-family: "Microsoft YaHei UI", "Microsoft YaHei", sans-serif; font-weight: 700; }
+
+  /* Game: flat landscape and dialogue boxes */
+  .game { background: #bfe6f0; }
+  .game .sun { position: absolute; left: 420px; top: 36px; width: 64px; height: 64px; border-radius: 50%; background: var(--yellow); }
+  .game .hill1 { position: absolute; left: -60px; top: 150px; width: 420px; height: 260px; border-radius: 50%; background: var(--teal); }
+  .game .hill2 { position: absolute; left: 250px; top: 175px; width: 420px; height: 260px; border-radius: 50%; background: var(--teal-dark); }
+  .game .castle { position: absolute; left: 150px; top: 110px; width: 80px; height: 70px; background: var(--ink);
+                  clip-path: polygon(0 100%, 0 30%, 14% 30%, 14% 12%, 28% 12%, 28% 30%, 40% 30%, 40% 0, 60% 0, 60% 30%, 72% 30%, 72% 12%, 86% 12%, 86% 30%, 100% 30%, 100% 100%); }
+  .game .flag { position: absolute; left: 187px; top: 92px; width: 22px; height: 14px; background: var(--red); }
+  .box { position: absolute; background: #fff; border: 4px solid var(--ink); border-radius: 12px; }
+
+  /* Video: flat city at dusk, player bar, subtitles */
+  .video { background: #2272d6; }
+  .video .sky2 { position: absolute; left: 0; right: 0; top: 150px; height: 190px; background: #4a92e6; }
+  .video .bld { position: absolute; bottom: 0; background: #16323a; }
+  .video .win { position: absolute; width: 10px; height: 12px; background: var(--yellow); }
+  .video .moon { position: absolute; left: 60px; top: 34px; width: 50px; height: 50px; border-radius: 50%; background: #fff4c7; }
+  .sub { position: absolute; left: 0; width: 540px; text-align: center; font-size: 25px; font-weight: 800; color: #fff; }
+  .sub b { background: rgba(22,50,58,.88); padding: 2px 10px; font-weight: 800; border-radius: 4px; }
+  .player { position: absolute; left: 0; right: 0; bottom: 0; height: 30px; background: #fff; }
+  .player .track { position: absolute; left: 50px; right: 18px; top: 13px; height: 5px; background: #d5e2e5; border-radius: 3px; }
+  .player .track i { position: absolute; left: 0; top: 0; bottom: 0; width: 42%; background: var(--red); border-radius: 3px; }
+  .player .play { position: absolute; left: 18px; top: 8px; width: 0; height: 0; border-left: 13px solid var(--ink); border-top: 7px solid transparent; border-bottom: 7px solid transparent; }
+
+  /* PDF: page in a viewer */
+  .pdf { background: #dfeaed; }
+  .page { position: absolute; left: 60px; top: 24px; width: 420px; height: 340px; background: #fff; border: 3px solid #b9ccd1; color: var(--ink); }
+  .chart { position: absolute; left: 34px; top: 176px; width: 190px; height: 104px; display: flex; align-items: flex-end; gap: 12px; }
+  .chart i { flex: 1; border-radius: 4px 4px 0 0; }
+
+  #logo { position: absolute; width: 600px; height: 600px; }
+  #logo img { position: absolute; inset: 0; width: 100%; height: 100%; }
+  #glint { position: absolute; inset: 0; opacity: 0; }
+  #glint i { position: absolute; top: -40%; width: 60px; height: 180%; background: rgba(255,255,255,.85); transform: rotate(35deg); }
+  #text { position: absolute; left: 900px; top: 355px; }
+  #text .name { font-size: 130px; font-weight: 900; letter-spacing: -2px; line-height: 1; }
+  #text .tag { font-size: 66px; font-weight: 900; margin-top: 22px; line-height: 1.1; }
+  #text .tag em { font-style: normal; color: var(--teal-dark); }
+  #text .sub2 { font-size: 32px; font-weight: 700; color: var(--muted); margin-top: 24px; }
+  #text .url { font-size: 28px; font-weight: 800; color: var(--red); margin-top: 10px; }
+  #text > div { opacity: 0; }
+  /* phone cut: screens stacked, end card centred under the logo */
+  .tall .label { font-size: 22px; }
+  .tall #text { width: 600px; text-align: center; }
+  .tall #text .name { font-size: 84px; }
+  .tall #text .tag { font-size: 40px; margin-top: 14px; }
+  .tall #text .sub2 { font-size: 22px; margin-top: 16px; }
+  .tall #text .url { font-size: 20px; margin-top: 6px; }
+</style></head>
+<body>
+
+<div id="s0" class="screen"><div class="content game">
+  <div class="sun"></div><div class="flag"></div><div class="castle"></div><div class="hill1"></div><div class="hill2"></div>
+  <div class="box" style="left:262px; top:118px; width:256px; height:84px;"></div>
+  <div class="jp" style="position:absolute; left:282px; top:130px; font-size:20px;">冒険を始めますか？</div>
+  <div class="tr" style="font-size:21px; font-weight:800; background:#fff;">Start your adventure?</div>
+  <div class="jp" style="position:absolute; left:282px; top:164px; font-size:20px;">▶ はい</div>
+  <div class="tr" style="font-size:21px; font-weight:800; background:#fff;">▶ Yes</div>
+  <div class="box" style="left:18px; top:218px; width:496px; height:98px;"></div>
+  <div class="jp" style="position:absolute; left:40px; top:230px; font-size:21px; color:var(--red);">王様</div>
+  <div class="tr" style="font-size:22px; font-weight:900; color:var(--red); background:#fff;">King</div>
+  <div class="jp" style="position:absolute; left:40px; top:264px; font-size:27px;">この村を救ってくれ。</div>
+  <div class="tr" style="font-size:28px; font-weight:800; background:#fff;">Save this village</div>
+</div><div class="pane"></div><div class="glass"></div><div class="rim"></div></div>
+
+<div id="s1" class="screen"><div class="content video">
+  <div class="moon"></div><div class="sky2"></div>
+  <div class="bld" style="left:20px; width:90px; height:170px;"></div>
+  <div class="bld" style="left:120px; width:70px; height:230px;"></div>
+  <div class="bld" style="left:200px; width:110px; height:150px;"></div>
+  <div class="bld" style="left:320px; width:80px; height:250px;"></div>
+  <div class="bld" style="left:410px; width:120px; height:190px;"></div>
+  <div class="win" style="left:40px; top:200px"></div><div class="win" style="left:140px; top:140px"></div>
+  <div class="win" style="left:160px; top:170px"></div><div class="win" style="left:340px; top:120px"></div>
+  <div class="win" style="left:440px; top:180px"></div><div class="win" style="left:470px; top:210px"></div>
+  <div class="sub" style="top:222px;"><b>¿Dónde está la estación de tren?</b></div>
+  <div class="tr sub" style="background:#16323a; border-radius:4px;">Where's the train station?</div>
+  <div class="sub" style="top:260px;"><b>Tenemos que irnos ya.</b></div>
+  <div class="tr sub" style="background:#16323a; border-radius:4px;">We have to go now.</div>
+  <div class="player"><div class="play"></div><div class="track"><i></i></div></div>
+</div><div class="pane"></div><div class="glass"></div><div class="rim"></div></div>
+
+<div id="s2" class="screen"><div class="content pdf"><div class="page">
+  <div class="zh" style="position:absolute; left:34px; top:28px; font-size:27px;">第三季度财务报告</div>
+  <div class="tr" style="font-size:19px; font-weight:900; background:#fff;">Financial report for the third quarter</div>
+  <div class="zh" style="position:absolute; left:34px; top:88px; font-size:20px; font-weight:400;">净利润创历史新高</div>
+  <div class="tr" style="font-size:20px; font-weight:700; background:#fff;">Net profits are at a record high.</div>
+  <div class="zh" style="position:absolute; left:34px; top:124px; font-size:20px; font-weight:400;">现金流保持稳定</div>
+  <div class="tr" style="font-size:20px; font-weight:700; background:#fff;">Cash flows remain stable.</div>
+  <div class="chart"><i style="height:40%; background:var(--blue)"></i><i style="height:58%; background:var(--teal)"></i><i style="height:74%; background:var(--yellow)"></i><i style="height:100%; background:var(--red)"></i></div>
+</div></div><div class="pane"></div><div class="glass"></div><div class="rim"></div></div>
+
+<div class="label" id="l0"><i style="background:var(--red)"></i>Game <span>· Japanese → English</span></div>
+<div class="label" id="l1"><i style="background:var(--blue)"></i>Video <span>· Spanish → English</span></div>
+<div class="label" id="l2"><i style="background:var(--yellow)"></i>PDF <span>· Chinese → English</span></div>
+
+<div id="logo">
+  <img id="pane" src="pane.png">
+  <div id="glint"><i></i></div>
+  <img id="full" src="../docs/logo.png">
+  <img id="parrot" src="parrot.png">
+</div>
+
+<div id="text">
+  <div class="name">Polyglass</div>
+  <div class="tag">Any Language. <em>Any Place.</em></div>
+  <div class="sub2">Free · Open source · Fully offline</div>
+  <div class="url">apierce-ptak.github.io/polyglass</div>
+</div>
+
+<script>
+const W = 540, H = 340;
+// full: 16:9 master; wide: the active band, for desktop pages; tall: stacked, for phones
+const LAYOUTS = {
+  full: { w: 1920, h: 1080, logo: [250, 240, 600], slots: [[90, 320], [690, 320], [1290, 320]], text: [900, 355] },
+  wide: { w: 1920, h: 720, logo: [128, 80, 600], slots: [[90, 160], [690, 160], [1290, 160]], text: [778, 195] },
+  tall: { w: 600, h: 1240, logo: [63, 300, 420], slots: [[30, 40], [30, 440], [30, 840]], text: [0, 710] },
+};
+const LAYOUT = new URLSearchParams(location.search).get('layout') || 'full';
+const LY = LAYOUTS[LAYOUT];
+window.SIZE = { w: LY.w, h: LY.h };
+document.documentElement.style.width = document.body.style.width = LY.w + 'px';
+document.documentElement.style.height = document.body.style.height = LY.h + 'px';
+document.body.classList.add(LAYOUT);
+const LOGO = { x: LY.logo[0], y: LY.logo[1], s: LY.logo[2] / 512 };
+document.getElementById('logo').style.width = document.getElementById('logo').style.height = LY.logo[2] + 'px';
+document.getElementById('text').style.left = LY.text[0] + 'px';
+document.getElementById('text').style.top = LY.text[1] + 'px';
+const QUAD = [[207, 222], [420, 174], [378, 424], [158, 468]]
+  .map(([x, y]) => [LOGO.x + x * LOGO.s, LOGO.y + y * LOGO.s]);
+const SLOT = LY.slots.map(([x, y]) => ({ x, y }));
+const SWEEP_AT = [1.0, 2.2, 3.4], SWEEP_LEN = 1.0;
+
+const clamp = v => Math.max(0, Math.min(1, v));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const easeOut = p => 1 - Math.pow(1 - p, 3);
+const easeInOut = p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2;
+const easeBack = p => { const c = 1.5; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); };
+const lerp = (a, b, p) => a + (b - a) * p;
+const $ = s => document.querySelector(s);
+
+// CSS matrix3d that maps a W x H box onto the quad q (TL, TR, BR, BL).
+function quadMatrix(q) {
+  const [[x0, y0], [x1, y1], [x2, y2], [x3, y3]] = q;
+  const dx1 = x1 - x2, dx2 = x3 - x2, dx3 = x0 - x1 + x2 - x3;
+  const dy1 = y1 - y2, dy2 = y3 - y2, dy3 = y0 - y1 + y2 - y3;
+  const den = dx1 * dy2 - dx2 * dy1;
+  const g = (dx3 * dy2 - dx2 * dy3) / den, h = (dx1 * dy3 - dx3 * dy1) / den;
+  const a = x1 - x0 + g * x1, b = x3 - x0 + h * x3, c = x0;
+  const d = y1 - y0 + g * y1, e = y3 - y0 + h * y3, f = y0;
+  return `matrix3d(${a / W},${d / W},0,${g / W},${b / H},${e / H},0,${h / H},0,0,1,0,${c},${f},0,1)`;
+}
+const rect = (x, y) => [[x, y], [x + W, y], [x + W, y + H], [x, y + H]];
+
+// Each translation covers the text of the line just before it, like the app.
+// Also records its left edge in screen coordinates, for the sliding pane.
+function layout() {
+  document.querySelectorAll('.tr').forEach(tr => {
+    const src = tr.previousElementSibling, box = tr.offsetParent.getBoundingClientRect();
+    const range = document.createRange(); range.selectNodeContents(src);
+    const r = range.getBoundingClientRect();
+    tr.style.width = 'auto'; tr.style.padding = '2px 10px 2px 6px'; tr.style.boxSizing = 'border-box';
+    tr.style.minWidth = (r.width + 16) + 'px';
+    const pad = Math.max(2, (r.height + 6 - tr.offsetHeight) / 2 + 2);
+    tr.style.paddingTop = tr.style.paddingBottom = pad + 'px';
+    tr.style.top = (r.top - box.top + (r.height - tr.offsetHeight) / 2) + 'px';
+    const w = tr.offsetWidth;
+    tr.style.left = (src.classList.contains('sub') ? r.left - box.left + r.width / 2 - w / 2 : r.left - box.left - 6) + 'px';
+    const screen = tr.closest('.screen').getBoundingClientRect();
+    tr.dataset.x = tr.getBoundingClientRect().left - screen.left;
+    tr.dataset.w = w;
+  });
+}
+
+$('#logo').style.left = LOGO.x + 'px';
+$('#logo').style.top = LOGO.y + 'px';
+
+window.render = function (t) {
+  for (let i = 0; i < 3; i++) {
+    const el = $('#s' + i), lab = $('#l' + i);
+    const pin = easeOut(seg(t, 0.1 + i * 0.12, 0.8 + i * 0.12));
+    const y = SLOT[i].y + (1 - pin) * 50;
+    const pc = easeInOut(seg(t, 5.3 + i * 0.08, 7.2 + i * 0.08));
+    const q = rect(SLOT[i].x, y).map((p, k) => [lerp(p[0], QUAD[k][0], pc), lerp(p[1], QUAD[k][1], pc)]);
+    el.style.transform = quadMatrix(q);
+    el.style.opacity = pin * (1 - seg(t, 7.35, 7.6));
+    el.style.borderRadius = lerp(16, 4, pc) + 'px';
+    el.style.boxShadow = `0 0 0 ${lerp(5, 0, seg(pc, 0, .5))}px #16323a, 0 22px 44px rgba(22,50,58,${.14 * (1 - pc)})`;
+    el.querySelector('.glass').style.opacity = seg(pc, 0.3, 0.9);
+    el.querySelector('.rim').style.opacity = seg(pc, 0.45, 0.95);
+    lab.style.left = SLOT[i].x + 'px';
+    lab.style.top = (y + H + (LAYOUT === 'tall' ? 12 : 30)) + 'px';
+    lab.style.opacity = pin * (1 - seg(t, 5.0, 5.4));
+
+    // the pane slides across; everything behind its leading edge is English
+    const sp = easeInOut(seg(t, SWEEP_AT[i], SWEEP_AT[i] + SWEEP_LEN));
+    const paneX = lerp(-150, W + 40, sp);
+    const pane = el.querySelector('.pane');
+    pane.style.left = paneX + 'px';
+    pane.style.opacity = sp > 0 && sp < 1 ? 1 : 0;
+    const edge = paneX + 55;
+    el.querySelectorAll('.tr').forEach(tr => {
+      const p = clamp((edge - parseFloat(tr.dataset.x)) / parseFloat(tr.dataset.w));
+      tr.style.clipPath = `inset(-4px ${100 - p * 100}% -4px -4px)`;
+    });
+  }
+
+  $('#pane').style.opacity = seg(t, 7.1, 7.45);
+  const g = seg(t, 7.45, 8.15);
+  const glint = $('#glint');
+  glint.style.opacity = g > 0 && g < 1 ? 1 : 0;
+  glint.style.clipPath = 'polygon(' + QUAD.map(([x, y]) => `${x - LOGO.x}px ${y - LOGO.y}px`).join(',') + ')';
+  glint.querySelector('i').style.left = lerp(100, 520, g) + 'px';
+
+  const pp = seg(t, 7.7, 8.5);
+  const parrot = $('#parrot');
+  parrot.style.opacity = seg(t, 7.7, 7.95);
+  parrot.style.transform = `translateY(${(1 - easeBack(pp)) * -260}px) rotate(${(1 - easeOut(pp)) * -10}deg)`;
+  parrot.style.transformOrigin = '270px 210px';
+  $('#full').style.opacity = seg(t, 8.5, 8.8);
+
+  document.querySelectorAll('#text > div').forEach((r, k) => {
+    const p = easeOut(seg(t, 8.7 + k * 0.22, 9.3 + k * 0.22));
+    r.style.opacity = p;
+    r.style.transform = `translateX(${(1 - p) * 40}px)`;
+  });
+};
+window.DURATION = 12.5;
+window.ready = document.fonts.ready.then(() => { layout(); render(0); });
+</script>
+</body></html>
