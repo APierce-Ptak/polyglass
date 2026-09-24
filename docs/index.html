@@ -68,11 +68,47 @@
   .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
   .small { font-size: 14px; color: var(--muted); margin-top: 14px; }
 
-  /* Demo: a real recording of Polyglass translating a (fictional) Chinese report */
-  .demo {
-    display: block; margin: 32px auto 0; width: 100%; max-width: 820px; height: auto;
-    border-radius: 14px; border: 1px solid var(--border);
-    box-shadow: 0 20px 50px rgba(0,0,0,.18);
+  /* Examples carousel: animated text scenes and a real recording, all the same size */
+  .carousel { max-width: 600px; margin: 32px auto 0; text-align: left; }
+  .stage {
+    position: relative; aspect-ratio: 820 / 674; border-radius: 14px; overflow: hidden;
+    background: var(--screen); color: var(--screen-text);
+    border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,.18);
+  }
+  .slide { position: absolute; inset: 0; opacity: 0; transition: opacity .5s; display: flex; flex-direction: column; }
+  .slide.active { opacity: 1; }
+  .slide img { width: 100%; height: 100%; display: block; object-fit: contain; background: #f4f6fa; }
+  .slide .bar {
+    display: flex; align-items: center; gap: 10px;
+    padding: 10px 16px; font-size: 14px; background: rgba(255,255,255,.06);
+  }
+  .dot { width: 9px; height: 9px; border-radius: 50%; background: #3ecf8e; }
+  .slide .lines { flex: 1; padding: 0 28px; display: flex; flex-direction: column; justify-content: center; gap: 22px; }
+  .line { position: relative; font-size: 24px; min-height: 1.5em; }
+  .line .src, .line .dst { transition: opacity .5s; }
+  .line .dst {
+    position: absolute; inset: 0; opacity: 0;
+    background: var(--overlay-bg); padding: 0 4px; margin: 0 -4px;
+  }
+  .slide.on .line .src { opacity: 0; }
+  .slide.on .line .dst { opacity: 1; }
+  .carousel-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
+  .carousel-nav .arrow {
+    width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
+    background: var(--surface); color: inherit; font-size: 20px; line-height: 1; cursor: pointer;
+  }
+  .dots { display: flex; gap: 6px; }
+  .dots button {
+    width: 24px; height: 24px; padding: 0; border: 0; background: none; cursor: pointer;
+    display: grid; place-items: center;
+  }
+  .dots button::before {
+    content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--border);
+  }
+  .dots button[aria-current="true"]::before { background: #3ecf8e; }
+  .caption { text-align: center; font-size: 14px; color: var(--muted); margin: 8px 0 0; min-height: 2.8em; }
+  @media (prefers-reduced-motion: reduce) {
+    .slide, .line .src, .line .dst { transition: none; }
   }
 
   section { padding: 48px 0; }
@@ -98,6 +134,8 @@
   @media (max-width: 520px) {
     header nav a:not(:last-child) { display: none; }
     .hero { padding-top: 32px; }
+    .line { font-size: 17px; }
+    .slide .lines { padding: 0 16px; gap: 14px; }
   }
 </style>
 </head>
@@ -124,8 +162,15 @@
     </div>
     <div class="small">Windows 10 or 11 · 100% local and private · No accounts or API keys · Free and open source (MIT)</div>
 
-    <img class="demo" src="demo.gif" width="820" height="674"
-         alt="Recording: a Chinese quarterly financial report on screen is replaced, line by line in place, with its English translation">
+    <div class="carousel" id="carousel" role="region" aria-roledescription="carousel" aria-label="Examples">
+      <div class="stage" id="stage"></div>
+      <div class="carousel-nav">
+        <button class="arrow" id="prev" aria-label="Previous example">&#8249;</button>
+        <div class="dots" id="dots"></div>
+        <button class="arrow" id="next" aria-label="Next example">&#8250;</button>
+      </div>
+      <p class="caption" id="caption" aria-live="polite"></p>
+    </div>
   </div>
 
   <section id="features">
@@ -180,5 +225,95 @@
   </div>
 </footer>
 
+<script>
+  // Examples carousel: two animated scenes (original, then its translation) and a real recording.
+  const slides = [
+    { from: 'JA', to: 'EN', caption: 'Game text · Japanese → English', lines: [
+      ['冒険を始めますか？', 'Do you want to start the adventure?'],
+      ['新しいアイテムを手に入れた！', 'You got a new item!'],
+      ['設定 · セーブ · 終了', 'Settings · Save · Quit'] ] },
+    { clip: 'demo.gif', ms: 7000, caption: 'Real recording · Chinese financial report → English',
+      alt: 'Recording: a Chinese quarterly financial report on screen is replaced, line by line in place, with its English translation' },
+    { from: 'EN', to: 'ES', caption: 'Web page · English → Spanish', lines: [
+      ['Welcome back, traveler', 'Bienvenido de nuevo, viajero'],
+      ['Your order has shipped', 'Tu pedido ha sido enviado'],
+      ['Settings · Save · Quit', 'Ajustes · Guardar · Salir'] ] },
+  ];
+  const stage = document.getElementById('stage');
+  const dots = document.getElementById('dots');
+  const caption = document.getElementById('caption');
+  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const els = slides.map((s, i) => {
+    const el = document.createElement('div');
+    el.className = 'slide';
+    el.setAttribute('aria-hidden', 'true');
+    if (s.clip) {
+      const img = document.createElement('img');
+      img.alt = s.alt; img.width = 820; img.height = 674; img.src = s.clip;
+      el.append(img);
+    } else {
+      const bar = document.createElement('div'); bar.className = 'bar';
+      const dot = document.createElement('span'); dot.className = 'dot';
+      const st = document.createElement('span'); st.className = 'status';
+      bar.append(dot, st);
+      const box = document.createElement('div'); box.className = 'lines';
+      for (const [src, dst] of s.lines) {
+        const line = document.createElement('div'); line.className = 'line';
+        const a = document.createElement('span'); a.className = 'src'; a.textContent = src;
+        const b = document.createElement('span'); b.className = 'dst'; b.textContent = dst;
+        line.append(a, b); box.append(line);
+      }
+      el.append(bar, box);
+    }
+    stage.append(el);
+    const d = document.createElement('button');
+    d.setAttribute('aria-label', 'Example ' + (i + 1) + ': ' + s.caption);
+    d.addEventListener('click', () => show(i));
+    dots.append(d);
+    return el;
+  });
+  let cur = 0, timers = [], paused = false;
+  function clear() { timers.forEach(clearTimeout); timers = []; }
+  function status(i, on) {
+    const s = slides[i], st = els[i].querySelector('.status');
+    if (st) st.textContent = 'Polyglass · live · ' + s.from + ' → ' + s.to + (on ? ' · translated 3 lines' : '');
+  }
+  function show(i) {
+    clear();
+    cur = (i + slides.length) % slides.length;
+    els.forEach((el, j) => {
+      el.classList.toggle('active', j === cur);
+      el.setAttribute('aria-hidden', j === cur ? 'false' : 'true');
+      el.classList.remove('on');
+    });
+    [...dots.children].forEach((d, j) => d.setAttribute('aria-current', j === cur ? 'true' : 'false'));
+    const s = slides[cur];
+    caption.textContent = s.caption;
+    let hold;
+    if (s.clip) {
+      els[cur].querySelector('img').src = s.clip + '?t=' + Date.now();   // restart the GIF
+      hold = s.ms;
+    } else {
+      status(cur, false);
+      timers.push(setTimeout(() => { els[cur].classList.add('on'); status(cur, true); }, reduce ? 0 : 1400));
+      hold = 4800;
+    }
+    if (!paused && !reduce) timers.push(setTimeout(() => show(cur + 1), hold));
+  }
+  document.getElementById('prev').addEventListener('click', () => show(cur - 1));
+  document.getElementById('next').addEventListener('click', () => show(cur + 1));
+  const car = document.getElementById('carousel');
+  car.addEventListener('mouseenter', () => { paused = true; });
+  car.addEventListener('mouseleave', () => { paused = false; show(cur); });
+  // Swipe on phones
+  let x0 = null;
+  stage.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
+  stage.addEventListener('touchend', e => {
+    if (x0 === null) return;
+    const dx = e.changedTouches[0].clientX - x0; x0 = null;
+    if (Math.abs(dx) > 40) show(cur + (dx < 0 ? 1 : -1));
+  });
+  show(0);
+</script>
 </body>
 </html>
