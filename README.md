@@ -7,6 +7,8 @@
 <p align="center"><em>Any language</em></p>
 <p align="center"><em>Any place</em></p>
 
+<p align="center"><a href="https://github.com/APierce-Ptak/polyglass/actions/workflows/tests.yml"><img src="https://github.com/APierce-Ptak/polyglass/actions/workflows/tests.yml/badge.svg" alt="Tests"></a></p>
+
 <p align="center">
   <a href="https://apierce-ptak.github.io/polyglass/"><strong>Website</strong></a> ·
   <a href="https://github.com/APierce-Ptak/polyglass/releases/latest/download/Polyglass.zip"><strong>Download for Windows</strong></a>
@@ -94,7 +96,7 @@ When it's done, delete the app folder. If `Install.bat` installed Python 3.12 fo
 
 ## Development
 
-Run the tests from the app folder:
+Tests run automatically on GitHub for every push (on a fresh Windows machine). To run them from the app folder:
 
 ```
 .venv\Scripts\python -m unittest -v
