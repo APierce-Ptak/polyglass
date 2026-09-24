@@ -37,9 +37,10 @@ import os
 import sys
 
 # Launched with pythonw (desktop shortcut): there is no console, so log to a file instead.
+# A fresh log each launch: it holds the text read off the screen, so it shouldn't pile up.
 if sys.stdout is None or sys.stderr is None:
     _log = open(os.path.join(os.path.dirname(os.path.abspath(__file__)), "polyglass.log"),
-                "a", encoding="utf-8", buffering=1)
+                "w", encoding="utf-8", buffering=1)
     if sys.stdout is None:
         sys.stdout = _log
     if sys.stderr is None:

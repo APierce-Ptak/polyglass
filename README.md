@@ -98,6 +98,18 @@ It also offers to remove the Windows text-recognition packs that `Install.bat` a
 
 When it's done, delete the app folder. If `Install.bat` installed Python 3.12 for you, you can remove it in **Settings → Apps** if nothing else uses it. Polyglass makes no other changes: no registry entries, startup items or services.
 
+## Privacy
+
+Polyglass collects nothing and sends nothing. Screenshots, the text it reads and the translations stay on your PC, and there are no accounts, analytics or telemetry.
+
+It only goes online to download things you ask for:
+
+- **Setup:** Python packages from PyPI, and Python itself through winget if it's missing.
+- **Text recognition:** Windows language packs, from Microsoft.
+- **Languages:** the list of available models and their sizes (from Argos Translate's index on GitHub), and the models you choose.
+
+`polyglass.log` in the app folder records the text Polyglass read and translated, to help with troubleshooting. It never leaves your PC, starts fresh each time the app starts, and `Uninstall.bat` removes it.
+
 ## Development
 
 Tests run automatically on GitHub for every push (on a fresh Windows machine). To run them from the app folder:

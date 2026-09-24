@@ -2,6 +2,11 @@
 
 Stable releases of Polyglass. Download the latest from the [Releases page](https://github.com/APierce-Ptak/polyglass/releases/latest).
 
+## 0.3.3 (2026-09-24)
+
+- **`polyglass.log` starts fresh each launch.** It records the text Polyglass reads off the screen, and it used to keep everything from every session, growing without limit in live mode. Now it only holds the current session.
+- Added a Privacy section to the README and the website: what Polyglass downloads and from where (nothing is ever uploaded).
+
 ## 0.3.2 (2026-09-24)
 
 - **Live mode now notices new text on a still screen.** It compared the whole screen at once, where a few lines of text barely register, so new dialogue was missed until something big changed (like the background). It now compares small blocks of the screen. In a test with six text changes, it went from 3 translated to all 6, each within about 2 seconds.
