@@ -3,3 +3,4 @@ __pycache__/
 *.pyc
 *.log
 polyglass.json
+ocr_added.txt

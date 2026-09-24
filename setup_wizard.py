@@ -23,6 +23,7 @@ VPYW = os.path.join(VENV_DIR, "Scripts", "pythonw.exe")
 APP = os.path.join(APP_DIR, "polyglass.py")
 CONFIG = os.path.join(APP_DIR, "polyglass.json")
 ICON = os.path.join(APP_DIR, "polyglass.ico")
+OCR_ADDED = os.path.join(APP_DIR, "ocr_added.txt")   # read by Uninstall.bat
 NO_WINDOW = 0x08000000
 
 # (label, Windows OCR pack tag or None when the built-in Latin OCR covers it, Argos code)
@@ -322,10 +323,22 @@ class Wizard(tk.Tk):
 
         self.step("Adding Windows OCR language packs", 55)
         if langs:
-            cmds = "; ".join(
-                f'Add-WindowsCapability -Online -Name Language.OCR~~~{tag}~~~0.0.1.0' for _, tag, _ in langs)
+            # Runs elevated. Records only the packs it actually adds, so Uninstall.bat
+            # never removes ones Windows (or the user) already had.
+            tags = ",".join(f"'{tag}'" for _, tag, _ in langs)
+            script = os.path.join(os.environ.get("TEMP", APP_DIR), "polyglass_add_ocr.ps1")
+            with open(script, "w", encoding="utf-8-sig") as f:
+                f.write(
+                    f"$added = '{OCR_ADDED.replace(chr(39), chr(39) * 2)}'\n"
+                    f"foreach ($t in @({tags})) {{\n"
+                    "  $n = \"Language.OCR~~~$t~~~0.0.1.0\"\n"
+                    "  if ((Get-WindowsCapability -Online -Name $n).State -ne 'Installed') {\n"
+                    "    Add-WindowsCapability -Online -Name $n | Out-Null\n"
+                    "    Add-Content -LiteralPath $added -Value $n\n"
+                    "  }\n"
+                    "}\n")
             ps = ("Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden "
-                  f"-ArgumentList '-NoProfile','-Command','{cmds}'")
+                  f"-ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"{script}\"'")
             self.say("Windows will ask permission to add: " + ", ".join(l for l, _, _ in langs))
             if self.run(["powershell", "-NoProfile", "-Command", ps]) != 0:
                 self.say("Permission was declined; OCR packs were skipped. (Chinese and Japanese still work without them.)")

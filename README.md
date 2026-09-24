@@ -70,6 +70,18 @@ py -3.12 -m venv .venv
 .venv\Scripts\python polyglass.py
 ```
 
+## Uninstall
+
+Double-click **`Uninstall.bat`**. It shows what it will remove and how much space that frees, then asks before removing anything:
+
+- the app's packages (`.venv` in the app folder, most of the ~3 GB)
+- the translation models in `%USERPROFILE%\.local\share\argos-translate` and their download cache in `%USERPROFILE%\.local\cache\argos-translate`. These are outside the app folder, and are shared with other Argos Translate apps if you have any.
+- the desktop shortcut, your settings and the logs
+
+It also offers to remove the Windows text-recognition packs that `Install.bat` added (not ones you already had). This needs admin permission.
+
+When it's done, delete the app folder. If `Install.bat` installed Python 3.12 for you, you can remove it in **Settings → Apps** if nothing else uses it. Polyglass makes no other changes: no registry entries, startup items or services.
+
 ## License
 
 MIT
