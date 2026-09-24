@@ -26,6 +26,22 @@ A transparent, click-through overlay for Windows that reads the text on your scr
 - Always-on bar at the top of the screen with the language pickers and a loading spinner while it works.
 - Click-through: you keep using your game or app normally.
 
+## What's in a name
+
+> **pol·y·glass** /ˈpɒl.i.ɡlæs/ *noun*
+>
+> **Etymology:** a double entendre.
+> - ***Poly-*** as in *polyglot*, from Greek *polýglōttos*, "many-tongued." It speaks many languages.
+> - ***Polly***, as in the parrot. Parrots repeat what they hear, and so does this, just in another language.
+> - ***-glass***: the screen you're looking through.
+>
+> *Glôssa* (Greek, "tongue") and *glass* are unrelated, but we'll take it.
+>
+> 1. A see-through pane that speaks every language on your screen.
+> 2. *(informal)* The parrot that reads your supplier's Chinese spreadsheet so you don't have to paste it into a website.
+>
+> *"Don't upload that report. Just polyglass it."*
+
 ## Install
 
 1. Download this repo (green **Code** button, then **Download ZIP**) and unzip it.
