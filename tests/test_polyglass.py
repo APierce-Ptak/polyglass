@@ -222,6 +222,35 @@ class DownloadSizes(unittest.TestCase):
         self.assertGreater(sizes.get(("fr", "en"), 0), 10_000_000)
 
 
+
+class LiveModeDetection(unittest.TestCase):
+    """New text on a still screen must trigger a rescan (it used to be missed entirely)."""
+
+    @staticmethod
+    def thumb(text=None, size=30):
+        from PIL import Image, ImageDraw, ImageFont
+        im = Image.new("RGB", (1920, 1080), "white")
+        if text:
+            ImageDraw.Draw(im).text((120, 300), text, fill="black",
+                                    font=ImageFont.truetype("segoeui.ttf", int(size * 1.33)))
+        return polyglass.np.asarray(im.convert("L").resize((160, 90)), dtype=polyglass.np.int16)
+
+    def overlay(self, regions=()):
+        return SimpleNamespace(last_thumb=self.thumb(), regions=list(regions), region_sigs=[],
+                               exclude_from_capture=True, block_change=Overlay.block_change)
+
+    def test_text_appearing_on_a_still_screen(self):
+        me = self.overlay()
+        for size in (14, 20, 30):
+            self.assertTrue(Overlay.changed(me, None, self.thumb("Hola, viajero.", size)), size)
+
+    def test_unchanged_screen(self):
+        self.assertFalse(Overlay.changed(self.overlay(), None, self.thumb()))
+
+    def test_new_text_elsewhere_after_a_translation(self):
+        self.assertTrue(Overlay.changed(self.overlay(regions=[]), None, self.thumb("Vuelve pronto.")))
+
+
 class Translation(unittest.TestCase):
     """Real offline translation with the installed models."""
 

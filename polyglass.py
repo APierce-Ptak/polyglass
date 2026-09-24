@@ -94,7 +94,10 @@ except Exception:  # optional
 TRANSPARENT = "#010101"
 HINT = "Ctrl+Alt+  T translate  L live  D swap  C clear  Q quit"
 LIVE_INTERVAL = 1.5
-CHANGE_THRESHOLD = 2.0   # mean abs diff on a 160x90 thumbnail to trigger a rescan
+# Live mode compares a 160x90 grey thumbnail of the screen with the last scan's, in 16x9 blocks
+# of 10x10 (about 120x120 screen pixels each). New text changes one block a lot but the whole
+# screen hardly at all: a line of 14 pt text moves its block by about 7, the screen by 0.05.
+BLOCK_THRESHOLD = 6.0
 MIN_SCRIPT_FRACTION = 0.3
 
 # Script prefixes (from unicodedata.name) used to pick the OCR language.
@@ -883,21 +886,26 @@ class Overlay:
         c = img.crop((x0, y0, x1, y1)).convert("L").resize((24, 8))
         return np.asarray(c, dtype=np.int16)
 
+    @staticmethod
+    def block_change(thumb, last):
+        """Largest mean difference of any 10x10 block between two 160x90 thumbnails."""
+        return float(np.abs(thumb - last).reshape(9, 10, 16, 10).mean(axis=(1, 3)).max())
+
     def changed(self, img, thumb):
         """True when the screen changed in a way that could alter the text."""
         if self.last_thumb is None:
             return True
-        g = float(np.abs(thumb - self.last_thumb).mean())
+        new_text = self.block_change(thumb, self.last_thumb) >= BLOCK_THRESHOLD
         if not self.regions:                 # nothing translated last time: watch for new text
-            return g >= 4.0
-        if g >= 10.0:                        # big scene change (new menu / level)
-            return True
-        if not self.exclude_from_capture:    # fallback mode: overlay pollutes crops
+            return new_text
+        if float(np.abs(thumb - self.last_thumb).mean()) >= 10.0:
+            return True                      # big scene change (new menu / level)
+        if not self.exclude_from_capture:    # fallback mode: our own overlay is in the capture
             return False
         for box, old in zip(self.regions, self.region_sigs):
             if float(np.abs(self.sig(img, box) - old).mean()) >= 14.0:
                 return True                  # text (or what's behind it) changed
-        return False
+        return new_text                      # new text somewhere else
 
     def work(self, force):
         hidden = False

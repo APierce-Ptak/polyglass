@@ -2,6 +2,10 @@
 
 Stable releases of Polyglass. Download the latest from the [Releases page](https://github.com/APierce-Ptak/polyglass/releases/latest).
 
+## 0.3.2 (2026-09-24)
+
+- **Live mode now notices new text on a still screen.** It compared the whole screen at once, where a few lines of text barely register, so new dialogue was missed until something big changed (like the background). It now compares small blocks of the screen. In a test with six text changes, it went from 3 translated to all 6, each within about 2 seconds.
+
 ## 0.3.1 (2026-09-24)
 
 - **Adding a Windows text-recognition pack is more reliable, and failures are explained.** If Windows' first installer silently does nothing (as on some Windows 10 PCs), Polyglass retries with DISM. If that fails too, the bar offers to open Windows' language settings, where adding the language installs it.
