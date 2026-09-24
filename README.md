@@ -39,6 +39,10 @@ Requirements: Windows 10 or 11, an internet connection for setup, and about 450 
 
 ## Use
 
+<img src="docs/bar.png" alt="The Polyglass bar with the From menu open: installed languages have a check mark, others show their download size" width="700">
+
+*The bar at the top of your screen. Click a language to change it: ✓ is installed, others show their download size.*
+
 Start **Polyglass** from the desktop shortcut (or `Run.bat`), click the window with the text, and press:
 
 | Hotkey | Action |

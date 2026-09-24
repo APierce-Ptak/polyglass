@@ -132,6 +132,10 @@
   .entry .usage { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); font-style: italic; color: var(--muted); }
   #name { padding-top: 8px; }
 
+  .shot { margin: 0 0 24px; }
+  .shot img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); }
+  .shot figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+
   section { padding: 48px 0; }
   h2 { font-size: 28px; margin: 0 0 20px; letter-spacing: -0.01em; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
@@ -252,6 +256,14 @@
   <section>
     <div class="wrap">
       <h2>Use</h2>
+      <figure class="shot">
+        <picture>
+          <source media="(max-width: 600px)" srcset="bar-narrow.png" width="500" height="352">
+          <img src="bar.png" width="1008" height="352" loading="lazy"
+             alt="The Polyglass bar at the top of the screen with the From menu open: installed languages have a check mark, others show their download size, such as 238 MB for Japanese">
+        </picture>
+        <figcaption>The bar at the top of your screen. Click a language to change it: ✓ is installed, others show their download size.</figcaption>
+      </figure>
       <p>Start Polyglass, click the window with the text, and press:</p>
       <table>
         <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd></td><td>Translate the screen once</td></tr>
