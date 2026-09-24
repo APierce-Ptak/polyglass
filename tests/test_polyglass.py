@@ -110,6 +110,46 @@ class OcrPackScript(unittest.TestCase):
                                               if t and c not in ("zh", "zt", "ja")})
 
 
+class OcrPackErrors(unittest.TestCase):
+    def reason(self, text):
+        with tempfile.TemporaryDirectory() as d:
+            log = os.path.join(d, "log.txt")
+            if text is not None:
+                with open(log, "w", encoding="utf-8") as f:
+                    f.write(text)
+            return Overlay.ocr_pack_error(log)
+
+    def test_declined_prompt_leaves_no_log(self):
+        self.assertIn("declined", self.reason(None))
+
+    def test_windows_error_is_shown(self):
+        self.assertEqual(self.reason("started\nes-ES failed: Add-WindowsCapability failed. Error code = 0x800f0954\n"),
+                         "Add-WindowsCapability failed. Error code = 0x800f0954")
+
+    def test_dism_error_code_preferred(self):
+        log = ("started\nes-ES state: NotPresent, restart needed: False\nes-ES dism exit 50, state: NotPresent\n"
+               "Error: 0x800f0954\nes-ES failed: Windows reports it as NotPresent\n")
+        self.assertEqual(self.reason(log), "Error: 0x800f0954")
+
+    def test_script_falls_back_to_dism(self):
+        setup_wizard.ocr_pack_command(["es-ES"])
+        with open(os.path.join(os.environ["TEMP"], "polyglass_add_ocr.ps1"), encoding="utf-8-sig") as f:
+            self.assertIn("dism.exe /Online /Add-Capability", f.read())
+
+    def test_added_but_not_visible_yet(self):
+        self.assertIn("restart", self.reason("started\nes-ES added\n"))
+
+    def test_script_logs_and_records_only_confirmed_installs(self):
+        setup_wizard.ocr_pack_command(["es-ES"])
+        with open(os.path.join(os.environ["TEMP"], "polyglass_add_ocr.ps1"), encoding="utf-8-sig") as f:
+            script = f.read()
+        self.assertIn(setup_wizard.OCR_LOG, script)
+        self.assertIn("-ErrorAction Stop", script)
+        # The pack is recorded for Uninstall.bat only after Windows reports it installed.
+        self.assertLess(script.index("-eq 'Installed') {\n      Add-Content -LiteralPath $added"),
+                        script.index("catch"))
+
+
 class Setup(unittest.TestCase):
     def test_model_download_code_is_valid_python(self):
         code = setup_wizard.model_download_code([("es", "en"), ("en", "es")])

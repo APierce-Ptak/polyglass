@@ -530,6 +530,13 @@ class Overlay:
                     self.draw(payload)
                 elif kind == "langs":
                     self.set_languages(*payload)
+                elif kind == "pack_failed":
+                    code, why = payload
+                    print(f"[ocr] {name(code)} pack not added: {why}", flush=True)
+                    # Windows' own Language settings install it reliably (add the language there).
+                    self.show_status(f"Windows didn't add {name(code)} text recognition. Click to add "
+                                     f"{name(code)} in Windows language settings instead", 20000,
+                                     action=lambda: os.startfile("ms-settings:regionlanguage"))
                 elif kind == "hide":
                     self.canvas.itemconfigure("tr", state="hidden")
                     self.canvas.update_idletasks()
@@ -576,15 +583,34 @@ class Overlay:
             self.working = True
             self.jobs.put(("status", f"Adding {name(code)} text recognition (Windows will ask permission)..."))
             try:
-                from setup_wizard import NO_WINDOW, ocr_pack_command
+                from setup_wizard import NO_WINDOW, OCR_LOG, ocr_pack_command
+                if os.path.exists(OCR_LOG):
+                    os.remove(OCR_LOG)
                 subprocess.run(ocr_pack_command([OCR_PACK[code]]), creationflags=NO_WINDOW)
-                ok = self.has_ocr_pack(code)
-                self.jobs.put(("status", f"{name(code)} text recognition added" if ok else
-                               f"{name(code)} text recognition was not added (permission declined?)"))
+                if self.has_ocr_pack(code):
+                    self.jobs.put(("status", f"{name(code)} text recognition added"))
+                else:
+                    self.jobs.put(("pack_failed", (code, self.ocr_pack_error(OCR_LOG))))
             finally:
                 self.working = False
 
         threading.Thread(target=install, daemon=True).start()
+
+    @staticmethod
+    def ocr_pack_error(log):
+        """Why adding an OCR pack failed, from the install script's log."""
+        try:
+            with open(log, encoding="utf-8-sig", errors="replace") as f:
+                lines = f.read().splitlines()
+        except OSError:
+            return "Windows' permission prompt was declined"
+        errors = [l.strip() for l in lines if l.strip().startswith("Error")]     # from DISM
+        fails = [l.split("failed:", 1)[1].strip() for l in lines if "failed:" in l]
+        if errors or fails:
+            return (errors or fails)[-1]
+        if any(l.endswith(" added") for l in lines):
+            return "Windows added it, but it isn't available yet; restart Polyglass (or the PC)"
+        return "unknown error"
 
     @staticmethod
     def has_ocr_pack(code):

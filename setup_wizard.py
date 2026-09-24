@@ -54,21 +54,44 @@ CODE = {l: c for l, _, c in LANGUAGES}
 TAG = {c: t for _, t, c in LANGUAGES}
 
 
+OCR_LOG = os.path.join(os.environ.get("TEMP", APP_DIR), "polyglass_add_ocr.log")
+
+
 def ocr_pack_command(tags):
     """Command that adds Windows OCR packs for `tags` (e.g. ["es-ES"]) behind one UAC prompt.
-    Records only the packs it actually adds, so Uninstall.bat never removes ones Windows (or
-    the user) already had. The app uses this too, to add a pack from its language bar."""
+    Records only the packs it actually adds, and only once Windows reports them installed, so
+    Uninstall.bat never removes ones Windows (or the user) already had. Each step and any error
+    goes to OCR_LOG (the elevated window is hidden). The app uses this too, from its language bar."""
     quoted = ",".join(f"'{t}'" for t in tags)
+    q = lambda path: path.replace("'", "''")
     script = os.path.join(os.environ.get("TEMP", APP_DIR), "polyglass_add_ocr.ps1")
     with open(script, "w", encoding="utf-8-sig") as f:
         f.write(
-            f"$added = '{OCR_ADDED.replace(chr(39), chr(39) * 2)}'\n"
+            f"$added = '{q(OCR_ADDED)}'\n"
+            f"$log = '{q(OCR_LOG)}'\n"
+            "Set-Content -LiteralPath $log -Value \"started $(Get-Date -Format s)\"\n"
             f"foreach ($t in @({quoted})) {{\n"
             "  $n = \"Language.OCR~~~$t~~~0.0.1.0\"\n"
-            "  if ((Get-WindowsCapability -Online -Name $n).State -ne 'Installed') {\n"
-            "    Add-WindowsCapability -Online -Name $n | Out-Null\n"
-            "    Add-Content -LiteralPath $added -Value $n\n"
-            "  }\n"
+            "  try {\n"
+            "    if ((Get-WindowsCapability -Online -Name $n -ErrorAction Stop).State -eq 'Installed') {\n"
+            "      Add-Content -LiteralPath $log -Value \"$t already installed\"; continue\n"
+            "    }\n"
+            "    $r = Add-WindowsCapability -Online -Name $n -ErrorAction Stop\n"
+            "    $state = (Get-WindowsCapability -Online -Name $n).State\n"
+            "    Add-Content -LiteralPath $log -Value \"$t state: $state, restart needed: $($r.RestartNeeded)\"\n"
+            # On some Windows 10 PCs Add-WindowsCapability returns without doing anything; DISM
+            # is the other way in, and reports a real error code when it fails.
+            "    if ($state -ne 'Installed') {\n"
+            "      $out = (& dism.exe /Online /Add-Capability /CapabilityName:$n /NoRestart /English 2>&1 | Out-String).Trim()\n"
+            "      $state = (Get-WindowsCapability -Online -Name $n).State\n"
+            "      Add-Content -LiteralPath $log -Value \"$t dism exit $LASTEXITCODE, state: $state\"\n"
+            "      if ($state -ne 'Installed') { Add-Content -LiteralPath $log -Value (($out -split \"`n\") | Select-Object -Last 3) }\n"
+            "    }\n"
+            "    if ($state -eq 'Installed') {\n"
+            "      Add-Content -LiteralPath $added -Value $n\n"
+            "      Add-Content -LiteralPath $log -Value \"$t added\"\n"
+            "    } else { Add-Content -LiteralPath $log -Value \"$t failed: Windows reports it as $state\" }\n"
+            "  } catch { Add-Content -LiteralPath $log -Value \"$t failed: $($_.Exception.Message)\" }\n"
             "}\n")
     ps = ("Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden "
           f"-ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"{script}\"'")

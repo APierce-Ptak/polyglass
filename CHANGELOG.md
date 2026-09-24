@@ -2,6 +2,12 @@
 
 Stable releases of Polyglass. Download the latest from the [Releases page](https://github.com/APierce-Ptak/polyglass/releases/latest).
 
+## 0.3.1 (2026-09-24)
+
+- **Adding a Windows text-recognition pack is more reliable, and failures are explained.** If Windows' first installer silently does nothing (as on some Windows 10 PCs), Polyglass retries with DISM. If that fails too, the bar offers to open Windows' language settings, where adding the language installs it.
+- Packs are recorded for `Uninstall.bat` only once Windows confirms they're installed (a failed install was recorded as added).
+- Each step and error of the pack install is logged to `%TEMP%\polyglass_add_ocr.log`.
+
 ## 0.3.0 (2026-09-24)
 
 - **Download sizes are shown before downloading.** The language bar's dropdowns show each missing language's size (for example ⬇ 238 MB) instead of just "Download", and the download message includes it. Setup shows the size for the languages you pick, and skips models that are already installed.
