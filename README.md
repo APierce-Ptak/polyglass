@@ -11,6 +11,10 @@
   <a href="https://github.com/APierce-Ptak/polyglass/archive/refs/heads/main.zip"><strong>Download for Windows</strong></a>
 </p>
 
+<p align="center">
+  <img src="docs/demo.gif" alt="Polyglass translating a Chinese financial report into English, in place" width="820">
+</p>
+
 A transparent, click-through overlay for Windows that reads the text on your screen and draws the translation, in the language you choose, **in the same spot**, right over the original. It works on games, videos, apps, and web pages.
 
 - **Any language to any language.** Pick *From* and *To* in the bar at the top of the screen, like Google Translate, or leave *From* on *Detect language*. Installed languages show ✓; others show ⬇ Download and download when you pick them. The ⇄ button (or Ctrl+Alt+D) swaps them.

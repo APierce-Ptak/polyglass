@@ -68,29 +68,11 @@
   .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
   .small { font-size: 14px; color: var(--muted); margin-top: 14px; }
 
-  /* Demo: a fake screen whose lines swap to their translation */
+  /* Demo: a real recording of Polyglass translating a (fictional) Chinese report */
   .demo {
-    margin: 32px auto 0; max-width: 640px; border-radius: 14px; overflow: hidden;
-    background: var(--screen); color: var(--screen-text);
-    border: 1px solid var(--border); text-align: left;
+    display: block; margin: 32px auto 0; width: 100%; max-width: 820px; height: auto;
+    border-radius: 14px; border: 1px solid var(--border);
     box-shadow: 0 20px 50px rgba(0,0,0,.18);
-  }
-  .demo .bar {
-    display: flex; align-items: center; gap: 10px;
-    padding: 8px 14px; font-size: 13px; background: rgba(255,255,255,.06);
-  }
-  .dot { width: 8px; height: 8px; border-radius: 50%; background: #3ecf8e; }
-  .demo .lines { padding: 22px 24px 26px; display: grid; gap: 14px; }
-  .line { position: relative; font-size: 18px; min-height: 1.6em; }
-  .line .src, .line .dst { transition: opacity .5s; }
-  .line .dst {
-    position: absolute; inset: 0; opacity: 0;
-    background: var(--overlay-bg); padding: 0 4px; margin: 0 -4px;
-  }
-  .demo.on .line .src { opacity: 0; }
-  .demo.on .line .dst { opacity: 1; }
-  @media (prefers-reduced-motion: reduce) {
-    .line .src, .line .dst { transition: none; }
   }
 
   section { padding: 48px 0; }
@@ -116,7 +98,6 @@
   @media (max-width: 520px) {
     header nav a:not(:last-child) { display: none; }
     .hero { padding-top: 32px; }
-    .line { font-size: 16px; }
   }
 </style>
 </head>
@@ -143,10 +124,8 @@
     </div>
     <div class="small">Windows 10 or 11 · Free and open source (MIT)</div>
 
-    <div class="demo" id="demo" aria-label="Example: Japanese text translated in place, then English text translated into Spanish">
-      <div class="bar"><span class="dot"></span><span id="status">Polyglass · live · JA → EN</span></div>
-      <div class="lines" id="lines"></div>
-    </div>
+    <img class="demo" src="demo.gif" width="820" height="674"
+         alt="Recording: a Chinese quarterly financial report on screen is replaced, line by line in place, with its English translation">
   </div>
 
   <section id="features">
@@ -199,49 +178,5 @@
   </div>
 </footer>
 
-<script>
-  // The demo shows two output languages: Japanese -> English, then English -> Spanish.
-  const scenes = [
-    { from: 'JA', to: 'EN', lines: [
-      ['冒険を始めますか？', 'Do you want to start the adventure?'],
-      ['新しいアイテムを手に入れた！', 'You got a new item!'],
-      ['設定 · セーブ · 終了', 'Settings · Save · Quit'] ] },
-    { from: 'EN', to: 'ES', lines: [
-      ['Welcome back, traveler', 'Bienvenido de nuevo, viajero'],
-      ['Your order has shipped', 'Tu pedido ha sido enviado'],
-      ['Settings · Save · Quit', 'Ajustes · Guardar · Salir'] ] },
-  ];
-  const demo = document.getElementById('demo');
-  const box = document.getElementById('lines');
-  const status = document.getElementById('status');
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  let scene = 0, on = false;
-  function render() {
-    box.innerHTML = '';
-    for (const [src, dst] of scenes[scene].lines) {
-      const line = document.createElement('div');
-      line.className = 'line';
-      const a = document.createElement('span'); a.className = 'src'; a.textContent = src;
-      const b = document.createElement('span'); b.className = 'dst'; b.textContent = dst;
-      line.append(a, b);
-      box.append(line);
-    }
-  }
-  function tick() {
-    if (on) {                       // translated: move on to the next scene's original text
-      on = false;
-      scene = (scene + 1) % scenes.length;
-      demo.classList.remove('on');
-      render();
-    } else {
-      on = true;
-      demo.classList.add('on');
-    }
-    status.textContent = 'Polyglass · live · ' + scenes[scene].from + ' → ' + scenes[scene].to + (on ? ' · translated 3 lines' : '');
-  }
-  render();
-  setTimeout(tick, 1200);
-  setInterval(tick, reduce ? 6000 : 3000);
-</script>
 </body>
 </html>
