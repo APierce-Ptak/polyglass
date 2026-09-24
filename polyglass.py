@@ -7,13 +7,14 @@ original.  Windows only.
 Hotkeys
     Ctrl+Alt+T   translate the screen once
     Ctrl+Alt+L   toggle live mode (re-scans about every 1.5 s)
-    Ctrl+Alt+D   switch the output language: English <-> your chosen language
+    Ctrl+Alt+D   swap the From and To languages
     Ctrl+Alt+C   clear the overlay
     Ctrl+Alt+Q   quit
 
 Settings live in polyglass.json next to this file (the setup wizard writes it):
-    "other_language"   your chosen output language besides English (e.g. "ja", "es")
-    "translate_to"     the current output language, "en" or other_language
+    "from"   the language on screen, or "auto" to detect it (e.g. "ja", "auto")
+    "to"     the language to translate into (e.g. "en", "es")
+The language on screen is always detected; "from" is what Ctrl+Alt+D swaps in.
 
 How it works
     1. mss grabs the primary monitor.
@@ -80,7 +81,7 @@ except Exception:  # optional
     detect_langs = None
 
 TRANSPARENT = "#010101"
-HINT = "Ctrl+Alt+  T translate  L live  D direction  C clear  Q quit"
+HINT = "Ctrl+Alt+  T translate  L live  D swap  C clear  Q quit"
 LIVE_INTERVAL = 1.5
 CHANGE_THRESHOLD = 2.0   # mean abs diff on a 160x90 thumbnail to trigger a rescan
 MIN_SCRIPT_FRACTION = 0.3
@@ -335,10 +336,10 @@ class Overlay:
         self.region_sigs = []
         self.translator = Translator(lambda m: self.jobs.put(("status", m)))
         self.config = load_config()
-        self.other = self.config.get("other_language") or None
-        self.target = self.config.get("translate_to", "en")
-        if self.target not in ("en", self.other):
-            self.target = "en"
+        self.source = self.config.get("from", "auto")
+        self.target = self.config.get("to", "en")
+        if self.source == self.target:
+            self.source = "auto"
 
         with mss.MSS() as sct:
             mon = sct.monitors[1]
@@ -357,7 +358,7 @@ class Overlay:
         keys = {
             "<ctrl>+<alt>+t": lambda: self.cmds.put("once"),
             "<ctrl>+<alt>+l": lambda: self.cmds.put("live"),
-            "<ctrl>+<alt>+d": lambda: self.cmds.put("direction"),
+            "<ctrl>+<alt>+d": lambda: self.cmds.put("swap"),
             "<ctrl>+<alt>+c": lambda: self.cmds.put("clear"),
             "<ctrl>+<alt>+q": lambda: self.cmds.put("quit"),
         }
@@ -404,8 +405,8 @@ class Overlay:
                 elif cmd == "live":
                     self.live = not self.live
                     self.show_status("Live mode ON" if self.live else "Live mode OFF", 1500)
-                elif cmd == "direction":
-                    self.switch_direction()
+                elif cmd == "swap":
+                    self.swap_languages()
                 elif cmd == "clear":
                     self.canvas.delete("tr")
                 elif cmd == "quit":
@@ -430,17 +431,22 @@ class Overlay:
             traceback.print_exc()
         self.root.after(50, self.pump)
 
-    def switch_direction(self):
-        if not self.other:
-            self.show_status("No output language set: run Install.bat and pick one under Also translate into", 5000)
+    def swap_languages(self):
+        """Ctrl+Alt+D: the same as the swap button next to From / To in setup."""
+        if self.source == "auto":
+            self.show_status("From is set to Detect: pick a From language in setup (Install.bat) to swap", 5000)
             return
-        self.target = self.other if self.target == "en" else "en"
-        self.config["translate_to"] = self.target
+        self.source, self.target = self.target, self.source
+        self.config.update({"from": self.source, "to": self.target})
         save_config(self.config)
         self.canvas.delete("tr")
         self.last_thumb = None                  # make live mode rescan right away
         self.regions, self.region_sigs = [], []
-        self.show_status(f"Now translating into {name(self.target)}", 2500)
+        self.show_status(f"Now translating {name(self.source)} -> {name(self.target)}", 2500)
+
+    def direction_label(self):
+        src = "AUTO" if self.source == "auto" else self.source.upper()
+        return f"{src} → {self.target.upper()}"
 
     # -- persistent top bar ---------------------------------------------------
     def build_bar(self):
@@ -474,7 +480,7 @@ class Overlay:
             text, hint = self.msg, ""
         else:
             text = ("Polyglass  \u2022  " + ("LIVE" if self.live else "Ready")
-                    + f"  \u2022  \u2192 {self.target.upper()}")
+                    + f"  \u2022  {self.direction_label()}")
             hint = HINT
         c.itemconfigure(self.msg_id, text=text)
         c.itemconfigure(self.hint_id, text=hint)

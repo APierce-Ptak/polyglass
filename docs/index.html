@@ -144,7 +144,7 @@
     <div class="small">Windows 10 or 11 · Free and open source (MIT)</div>
 
     <div class="demo" id="demo" aria-label="Example: Japanese text translated in place, then English text translated into Spanish">
-      <div class="bar"><span class="dot"></span><span id="status">Polyglass · live · → EN</span></div>
+      <div class="bar"><span class="dot"></span><span id="status">Polyglass · live · JA → EN</span></div>
       <div class="lines" id="lines"></div>
     </div>
   </div>
@@ -155,7 +155,7 @@
       <div class="grid">
         <div class="card"><h3>Translates in place</h3><p>Each translation is painted over its source line, on a background colour sampled from your screen.</p></div>
         <div class="card"><h3>Fully offline</h3><p>OCR and translation both run on your PC. Nothing is sent anywhere.</p></div>
-        <div class="card"><h3>Your language, any direction</h3><p>Pick the language you want to read in. Polyglass translates the screen into it, or into English, and Ctrl+Alt+D switches between the two.</p></div>
+        <div class="card"><h3>Any language, any direction</h3><p>Pick From and To like Google Translate, or let it detect the language. Ctrl+Alt+D swaps them.</p></div>
         <div class="card"><h3>Many languages</h3><p>Chinese, Japanese, Korean, Russian, Arabic, and Latin-script languages like Spanish, French and German, including stylised game fonts.</p></div>
         <div class="card"><h3>Live mode</h3><p>Re-translates only when the text on screen actually changes, so it stays light on CPU.</p></div>
         <div class="card"><h3>Click-through</h3><p>The overlay never gets in the way. Keep playing or working normally.</p></div>
@@ -169,7 +169,7 @@
       <ol class="steps">
         <li><a href="https://github.com/APierce-Ptak/polyglass/archive/refs/heads/main.zip">Download the ZIP</a> and unzip it.</li>
         <li>Double-click <strong>Install.bat</strong>.</li>
-        <li>Follow the setup wizard. Pick the languages you'll see on screen and the language you want translations in. It sets up Python, OCR language packs and offline translation models, and makes a desktop shortcut.</li>
+        <li>Follow the setup wizard. Choose <em>Translate from</em> (or <em>Detect language</em>) and <em>Translate to</em>. It sets up Python, OCR language packs and offline translation models, and makes a desktop shortcut.</li>
       </ol>
       <p class="note">Needs an internet connection for setup and about 3 GB of disk space. If Python 3.10–3.12 is missing, the installer gets it for you.</p>
     </div>
@@ -182,7 +182,7 @@
       <table>
         <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>T</kbd></td><td>Translate the screen once</td></tr>
         <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>L</kbd></td><td>Turn live mode on or off</td></tr>
-        <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd></td><td>Switch the output language between English and your chosen language</td></tr>
+        <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>D</kbd></td><td>Swap the From and To languages</td></tr>
         <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>C</kbd></td><td>Clear the overlay</td></tr>
         <tr><td><kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>Q</kbd></td><td>Quit</td></tr>
       </table>
@@ -201,11 +201,11 @@
 <script>
   // The demo shows two output languages: Japanese -> English, then English -> Spanish.
   const scenes = [
-    { to: 'EN', lines: [
+    { from: 'JA', to: 'EN', lines: [
       ['冒険を始めますか？', 'Do you want to start the adventure?'],
       ['新しいアイテムを手に入れた！', 'You got a new item!'],
       ['設定 · セーブ · 終了', 'Settings · Save · Quit'] ] },
-    { to: 'ES', lines: [
+    { from: 'EN', to: 'ES', lines: [
       ['Welcome back, traveler', 'Bienvenido de nuevo, viajero'],
       ['Your order has shipped', 'Tu pedido ha sido enviado'],
       ['Settings · Save · Quit', 'Ajustes · Guardar · Salir'] ] },
@@ -236,7 +236,7 @@
       on = true;
       demo.classList.add('on');
     }
-    status.textContent = 'Polyglass · live · → ' + scenes[scene].to + (on ? ' · translated 3 lines' : '');
+    status.textContent = 'Polyglass · live · ' + scenes[scene].from + ' → ' + scenes[scene].to + (on ? ' · translated 3 lines' : '');
   }
   render();
   setTimeout(tick, 1200);

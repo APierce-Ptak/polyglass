@@ -25,19 +25,25 @@ CONFIG = os.path.join(APP_DIR, "polyglass.json")
 ICON = os.path.join(APP_DIR, "polyglass.ico")
 NO_WINDOW = 0x08000000
 
-# (label, Windows OCR tag, Argos code)
-LANGS = [
+# (label, Windows OCR pack tag or None when the built-in Latin OCR covers it, Argos code)
+LANGUAGES = [
+    ("English", None, "en"),
     ("Chinese (Simplified)", "zh-CN", "zh"),
     ("Chinese (Traditional)", "zh-TW", "zt"),
     ("Japanese", "ja-JP", "ja"),
     ("Korean", "ko-KR", "ko"),
     ("Russian", "ru-RU", "ru"),
     ("Arabic", "ar-SA", "ar"),
+    ("Spanish", None, "es"),
+    ("French", None, "fr"),
+    ("German", None, "de"),
+    ("Portuguese", None, "pt"),
+    ("Italian", None, "it"),
 ]
-LATIN = [("Spanish", "es"), ("French", "fr"), ("German", "de"),
-         ("Portuguese", "pt"), ("Italian", "it")]
-# Choices for the second output language (label, Argos code).
-REVERSE = [("None", "")] + [(l, c) for l, _, c in LANGS] + LATIN
+DETECT = "Detect language"
+LABEL = {c: l for l, _, c in LANGUAGES}
+CODE = {l: c for l, _, c in LANGUAGES}
+TAG = {c: t for _, t, c in LANGUAGES}
 
 BG, FG, ACCENT, MUTED = "#15171c", "#f2f3f5", "#4fc3f7", "#8b93a7"
 
@@ -48,15 +54,16 @@ class Wizard(tk.Tk):
         self.title("Polyglass Setup")
         if os.path.exists(ICON):
             self.iconbitmap(ICON)
-        self.geometry("680x600")
+        self.geometry("680x540")
         self.resizable(False, False)
         self.configure(bg=BG)
         self.q = queue.Queue()
-        self.lang_vars = {c: tk.BooleanVar(value=(c == "zh")) for _, _, c in LANGS}
-        self.latin_vars = {c: tk.BooleanVar(value=False) for _, c in LATIN}
         self.config_data = self.load_config()
-        prev = self.config_data.get("other_language", "")
-        self.reverse = tk.StringVar(value=next((l for l, c in REVERSE if c == prev), "None"))
+        src = self.config_data.get("from", "auto")
+        dst = self.config_data.get("to", "en")
+        self.src = tk.StringVar(value=LABEL.get(src, DETECT))
+        self.dst = tk.StringVar(value=LABEL.get(dst, "English"))
+        self.prev = (self.src.get(), self.dst.get())
         self.shortcut = tk.BooleanVar(value=True)
         self.launch = tk.BooleanVar(value=True)
         self.ok = True
@@ -71,6 +78,9 @@ class Wizard(tk.Tk):
         style.map("TCheckbutton", background=[("active", BG)])
         style.configure("TButton", font=("Segoe UI", 10), padding=6)
         style.configure("Accent.TButton", font=("Segoe UI", 10, "bold"))
+        style.configure("Swap.TButton", font=("Segoe UI", 14), padding=(8, 2))
+        style.configure("TCombobox", padding=6)
+        self.option_add("*TCombobox*Listbox.font", ("Segoe UI", 10))
         style.configure("Horizontal.TProgressbar", troughcolor="#262a33",
                         background=ACCENT, bordercolor=BG, lightcolor=ACCENT, darkcolor=ACCENT)
 
@@ -130,32 +140,63 @@ class Wizard(tk.Tk):
         self.next_btn.config(text="Next")
 
     def page_langs(self):
-        ttk.Label(self.body, text="Which languages?", style="H.TLabel").pack(anchor="w")
-        ttk.Label(self.body, style="M.TLabel", wraplength=620, text="Pick the languages you'll see on screen, and optionally the language you want translations in (besides English). You can rerun this wizard to change them.").pack(anchor="w", pady=(2, 14))
-        grid = ttk.Frame(self.body)
-        grid.pack(anchor="w")
-        for i, (label, _tag, code) in enumerate(LANGS):
-            ttk.Checkbutton(grid, text=label, variable=self.lang_vars[code]).grid(
-                row=i % 3, column=i // 3, sticky="w", padx=(0, 40), pady=3)
-        ttk.Label(self.body, text="Latin-script languages (auto-detected)", style="M.TLabel").pack(anchor="w", pady=(16, 4))
-        g2 = ttk.Frame(self.body)
-        g2.pack(anchor="w")
-        for i, (label, code) in enumerate(LATIN):
-            ttk.Checkbutton(g2, text=label, variable=self.latin_vars[code]).grid(
-                row=i // 3, column=i % 3, sticky="w", padx=(0, 30), pady=3)
-        rev = ttk.Frame(self.body)
-        rev.pack(anchor="w", pady=(16, 0))
-        ttk.Label(rev, text="Also translate into:").pack(side="left")
-        ttk.Combobox(rev, textvariable=self.reverse, state="readonly", width=22,
-                     values=[l for l, _ in REVERSE]).pack(side="left", padx=(10, 0))
-        ttk.Label(self.body, style="M.TLabel", text="Switch between English and this language any time with Ctrl+Alt+D.").pack(anchor="w", pady=(4, 0))
-        ttk.Separator(self.body).pack(fill="x", pady=14)
+        ttk.Label(self.body, text="Languages", style="H.TLabel").pack(anchor="w")
+        ttk.Label(self.body, style="M.TLabel", wraplength=620, text=(
+            "Choose the language on your screen and the language you want to read. "
+            "You can run this wizard again to change them.")).pack(anchor="w", pady=(2, 22))
+
+        row = ttk.Frame(self.body)
+        row.pack(anchor="w")
+        ttk.Label(row, text="Translate from", style="M.TLabel").grid(row=0, column=0, sticky="w")
+        ttk.Label(row, text="Translate to", style="M.TLabel").grid(row=0, column=2, sticky="w")
+        names = [l for l, _, _ in LANGUAGES]
+        src = ttk.Combobox(row, textvariable=self.src, state="readonly", width=24,
+                           values=[DETECT] + names, font=("Segoe UI", 11))
+        dst = ttk.Combobox(row, textvariable=self.dst, state="readonly", width=24,
+                           values=names, font=("Segoe UI", 11))
+        src.grid(row=1, column=0, pady=(4, 0))
+        dst.grid(row=1, column=2, pady=(4, 0))
+        self.swap_btn = ttk.Button(row, text="\u21c4", style="Swap.TButton", width=3, command=self.swap)
+        self.swap_btn.grid(row=1, column=1, padx=14, pady=(4, 0))
+        src.bind("<<ComboboxSelected>>", lambda e: self.picked())
+        dst.bind("<<ComboboxSelected>>", lambda e: self.picked())
+        self.lang_note = ttk.Label(self.body, style="M.TLabel", wraplength=620, justify="left")
+        self.lang_note.pack(anchor="w", pady=(12, 0))
+        self.picked()
+
+        ttk.Separator(self.body).pack(fill="x", pady=22)
         ttk.Checkbutton(self.body, text="Create a desktop shortcut", variable=self.shortcut).pack(anchor="w", pady=2)
         ttk.Checkbutton(self.body, text="Start Polyglass when setup finishes", variable=self.launch).pack(anchor="w", pady=2)
         ttk.Label(self.body, style="M.TLabel", wraplength=620, text=(
-            "Windows will ask for permission (a UAC prompt) once, to add the OCR language packs.")).pack(anchor="w", pady=(14, 0))
+            "Windows may ask for permission (a UAC prompt) once, to add text-recognition packs.")).pack(anchor="w", pady=(14, 0))
         self.back_btn.state(["!disabled"])
         self.next_btn.config(text="Install")
+
+    def swap(self):
+        if self.src.get() == DETECT:
+            return
+        a, b = self.src.get(), self.dst.get()
+        self.src.set(b)
+        self.dst.set(a)
+        self.picked()
+
+    def picked(self):
+        """Keep From and To different (like Google Translate) and refresh the swap button."""
+        src, dst = self.src.get(), self.dst.get()
+        if src == dst:
+            old_src, old_dst = self.prev
+            if src != old_src:          # From changed to match To: move To to the old From
+                self.dst.set(old_src if old_src != DETECT else ("Spanish" if src == "English" else "English"))
+            else:                       # To changed to match From: move From to the old To
+                self.src.set(old_dst)
+        self.prev = (self.src.get(), self.dst.get())
+        detect = self.src.get() == DETECT
+        self.swap_btn.state(["disabled"] if detect else ["!disabled"])
+        self.lang_note.config(text=(
+            "Polyglass works out the language on screen by itself. Translation models download "
+            "the first time a new language appears."
+            if detect else
+            "Press Ctrl+Alt+D in the app to swap them, just like the \u21c4 button."))
 
     def page_install(self):
         ttk.Label(self.body, text="Setting things up...", style="H.TLabel").pack(anchor="w")
@@ -176,7 +217,7 @@ class Wizard(tk.Tk):
             "Polyglass is ready.\n\n"
             "  Ctrl+Alt+T   translate the screen once\n"
             "  Ctrl+Alt+L   turn live mode on or off\n"
-            "  Ctrl+Alt+D   switch the output language (English / your language)\n"
+            "  Ctrl+Alt+D   swap the From and To languages\n"
             "  Ctrl+Alt+C   clear the overlay\n"
             "  Ctrl+Alt+Q   quit\n\n"
             "Open the app, click the window with the text, then press Ctrl+Alt+T."
@@ -197,11 +238,9 @@ class Wizard(tk.Tk):
         except (OSError, ValueError):
             return {}
 
-    def save_config(self, other):
+    def save_config(self, src, dst):
         cfg = self.config_data
-        cfg["other_language"] = other
-        if cfg.get("translate_to") not in ("en", other):
-            cfg["translate_to"] = "en"
+        cfg.update({"from": src, "to": dst})
         with open(CONFIG, "w", encoding="utf-8") as f:
             json.dump(cfg, f, indent=2)
 
@@ -255,11 +294,18 @@ class Wizard(tk.Tk):
         self.q.put(("done", None))
 
     def _install(self):
-        langs = [(l, t, c) for l, t, c in LANGS if self.lang_vars[c].get()]
-        argos = [c for _, _, c in langs] + [c for _, c in LATIN if self.latin_vars[c].get()]
-        other = dict(REVERSE).get(self.reverse.get(), "")
-        pairs = [(c, "en") for c in argos] + ([("en", other)] if other else [])
-        self.save_config(other)
+        src = "auto" if self.src.get() == DETECT else CODE[self.src.get()]
+        dst = CODE[self.dst.get()]
+        self.save_config(src, dst)
+        # Text-recognition packs: every script when detecting, otherwise both sides so swapping works.
+        wanted = [c for _, _, c in LANGUAGES] if src == "auto" else [src, dst]
+        langs = [(LABEL[c], TAG[c], c) for c in wanted if TAG[c]]
+        # Models: both directions, going through English where needed (the app does the same).
+        pairs = []
+        for a, b in ([] if src == "auto" else [(src, dst), (dst, src)]) + ([("en", dst)] if src == "auto" else []):
+            for leg in ([(a, b)] if "en" in (a, b) else [(a, "en"), ("en", b)]):
+                if leg[0] != leg[1] and leg not in pairs:
+                    pairs.append(leg)
 
         self.step("Creating a private Python environment", 3)
         if not os.path.exists(VPY):
@@ -282,7 +328,7 @@ class Wizard(tk.Tk):
                   f"-ArgumentList '-NoProfile','-Command','{cmds}'")
             self.say("Windows will ask permission to add: " + ", ".join(l for l, _, _ in langs))
             if self.run(["powershell", "-NoProfile", "-Command", ps]) != 0:
-                self.say("Permission was declined; OCR packs were skipped. (Chinese still works without them.)")
+                self.say("Permission was declined; OCR packs were skipped. (Chinese and Japanese still work without them.)")
         self.run([VPY, "-c",
                   "from winsdk.windows.media.ocr import OcrEngine;"
                   "print('Windows OCR languages:', [l.language_tag for l in OcrEngine.available_recognizer_languages])"])

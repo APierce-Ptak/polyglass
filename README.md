@@ -13,7 +13,7 @@
 
 A transparent, click-through overlay for Windows that reads the text on your screen and draws the translation, in the language you choose, **in the same spot**, right over the original. It works on games, videos, apps, and web pages.
 
-- **Translates into the language you choose,** not just English: pick your language in setup and Polyglass translates the screen into it. Ctrl+Alt+D switches the output between English and your language.
+- **Any language to any language.** Pick *From* and *To* in setup, like Google Translate, or leave *From* on *Detect language*. Ctrl+Alt+D swaps them, like the ⇄ button.
 - Supports Chinese, Japanese, Korean, Russian, Arabic, and Latin-script languages (Spanish, French, German, and others). Between two non-English languages (for example Japanese → Spanish), it translates through English.
 - Fully offline: OCR and translation both run on your PC.
 - Live mode re-translates only when the text on screen actually changes, so it doesn't waste CPU.
@@ -24,7 +24,7 @@ A transparent, click-through overlay for Windows that reads the text on your scr
 
 1. Download this repo (green **Code** button, then **Download ZIP**) and unzip it.
 2. Double-click **`Install.bat`**.
-3. Follow the setup wizard. Pick the languages you'll see on screen and, optionally, the language you want translations in (besides English). The wizard creates a private Python environment, installs the packages, adds Windows OCR language packs, downloads the offline translation models, and makes a desktop shortcut.
+3. Follow the setup wizard. Choose *Translate from* (or *Detect language*) and *Translate to*, with a ⇄ button to swap them. The wizard creates a private Python environment, installs the packages, adds Windows OCR language packs, downloads the offline translation models, and makes a desktop shortcut.
 
 Requirements: Windows 10 or 11, an internet connection for setup, and about 3 GB of free disk space. If Python 3.10-3.12 is missing, `Install.bat` installs it with winget or sends you to the download page.
 
@@ -36,11 +36,11 @@ Start **Polyglass** from the desktop shortcut (or `Run.bat`), click the window w
 |---|---|
 | Ctrl+Alt+T | Translate the screen once |
 | Ctrl+Alt+L | Turn live mode on or off |
-| Ctrl+Alt+D | Switch the output language between English and your chosen language |
+| Ctrl+Alt+D | Swap the From and To languages |
 | Ctrl+Alt+C | Clear the overlay |
 | Ctrl+Alt+Q | Quit |
 
-The status bar shows the current direction (for example `→ EN` or `→ JA`). Text that is already in the output language is left alone.
+The status bar shows the current languages (for example `JA → EN`, or `AUTO → EN` when detecting). Text that is already in the output language is left alone.
 
 The first translation after each launch takes several seconds while the models load. After that it takes 1-3 seconds.
 
@@ -59,7 +59,7 @@ Run `Debug.bat` to see a console with what the app is doing. It prints the insta
 
 - **Says only `en-US` is installed:** re-run `Install.bat` and tick the language, then accept the Windows permission prompt.
 - **Nothing appears over a game:** switch the game to windowed or borderless.
-- **Ctrl+Alt+D says no other language is set:** re-run `Install.bat` and pick a language under "Also translate into". You can also add `"other_language": "es"` (or another code) to `polyglass.json` in the app folder.
+- **Ctrl+Alt+D won't swap:** *From* is set to *Detect language*, so there's nothing to swap with. Re-run `Install.bat` and pick a *From* language, or set `"from"` and `"to"` (for example `"ja"` and `"en"`) in `polyglass.json` in the app folder.
 - **Wrong or odd translations:** offline models are good but not perfect. Text is translated line by line.
 
 ## Manual install
