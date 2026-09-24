@@ -16,6 +16,8 @@ import tkinter as tk
 import venv
 from tkinter import ttk
 
+import model_sizes
+
 APP_DIR = os.path.dirname(os.path.abspath(__file__))
 VENV_DIR = os.path.join(APP_DIR, ".venv")
 VPY = os.path.join(VENV_DIR, "Scripts", "python.exe")
@@ -74,6 +76,17 @@ def ocr_pack_command(tags):
 
 
 
+def model_pairs(src, dst):
+    """Models setup downloads for From `src` / To `dst`: both directions, so swapping works,
+    going through English between two other languages. With Detect, only English -> To."""
+    pairs = []
+    for a, b in [("en", dst)] if src == "auto" else [(src, dst), (dst, src)]:
+        for leg in [(a, b)] if "en" in (a, b) else [(a, "en"), ("en", b)]:
+            if leg[0] != leg[1] and leg not in pairs:
+                pairs.append(leg)
+    return pairs
+
+
 def model_download_code(pairs):
     """Python, run inside the app's environment, that downloads and installs the translation
     models for `pairs` (e.g. [("es", "en")]). It unzips them itself: Argos's install_from_path
@@ -104,6 +117,9 @@ class Wizard(tk.Tk):
         self.resizable(False, False)
         self.configure(bg=BG)
         self.q = queue.Queue()
+        self.sizes = None                  # model download sizes, once known ({} offline)
+        threading.Thread(target=lambda: self.q.put(("sizes", model_sizes.fetch_sizes(
+            model_sizes.load_index(), set(CODE.values())))), daemon=True).start()
         self.config_data = self.load_config()
         src = self.config_data.get("from", "auto")
         dst = self.config_data.get("to", "en")
@@ -181,7 +197,8 @@ class Wizard(tk.Tk):
             "  •  Download the offline translation models\n"
             "  •  Create a desktop shortcut\n\n"
             "Everything runs on your PC. Nothing is sent to the cloud.\n"
-            "It takes a few minutes and needs about 1 GB of disk space and an internet connection.")).pack(anchor="w")
+            "It takes a few minutes and needs an internet connection, and about 450 MB of disk\n"
+            "space plus your languages (usually 150-400 MB each; you'll see the exact size).")).pack(anchor="w")
         self.back_btn.state(["disabled"])
         self.next_btn.config(text="Next")
 
@@ -208,6 +225,8 @@ class Wizard(tk.Tk):
         dst.bind("<<ComboboxSelected>>", lambda e: self.picked())
         self.lang_note = ttk.Label(self.body, style="M.TLabel", wraplength=620, justify="left")
         self.lang_note.pack(anchor="w", pady=(12, 0))
+        self.size_note = ttk.Label(self.body, wraplength=620, justify="left")
+        self.size_note.pack(anchor="w", pady=(8, 0))
         self.picked()
 
         ttk.Separator(self.body).pack(fill="x", pady=22)
@@ -243,6 +262,24 @@ class Wizard(tk.Tk):
             "the first time a new language appears."
             if detect else
             "Press Ctrl+Alt+D in the app to swap them, just like the \u21c4 button."))
+        self.show_size()
+
+    def show_size(self):
+        """How much the chosen languages download (models already installed don't count)."""
+        src = "auto" if self.src.get() == DETECT else CODE[self.src.get()]
+        installed = model_sizes.installed_pairs()
+        legs = [leg for leg in model_pairs(src, CODE[self.dst.get()]) if leg not in installed]
+        later = " Other languages download when they first appear." if src == "auto" else ""
+        if not legs:
+            text = ("Nothing to download now." + later if src == "auto" else
+                    "Nothing to download: these languages are already installed.")
+        elif self.sizes is None:
+            text = "Download size: checking..."
+        elif model_sizes.total(legs, self.sizes) is None:
+            text = "Download size: unknown (checking it needs internet)."
+        else:
+            text = f"Download: about {model_sizes.label(model_sizes.total(legs, self.sizes))}." + later
+        self.size_note.config(text=text)
 
     def page_install(self):
         ttk.Label(self.body, text="Setting things up...", style="H.TLabel").pack(anchor="w")
@@ -313,6 +350,10 @@ class Wizard(tk.Tk):
                 elif kind == "step":
                     self.step_lbl.config(text=val[0])
                     self.bar["value"] = val[1]
+                elif kind == "sizes":
+                    self.sizes = val
+                    if self.page == 1:
+                        self.show_size()
                 elif kind == "done":
                     self.page = 3
                     self.show()
@@ -346,12 +387,8 @@ class Wizard(tk.Tk):
         # Text-recognition packs: every script when detecting, otherwise both sides so swapping works.
         wanted = [c for _, _, c in LANGUAGES if c not in LATIN] if src == "auto" else [src, dst]
         langs = [(LABEL[c], TAG[c], c) for c in wanted if TAG[c]]
-        # Models: both directions, going through English where needed (the app does the same).
-        pairs = []
-        for a, b in ([] if src == "auto" else [(src, dst), (dst, src)]) + ([("en", dst)] if src == "auto" else []):
-            for leg in ([(a, b)] if "en" in (a, b) else [(a, "en"), ("en", b)]):
-                if leg[0] != leg[1] and leg not in pairs:
-                    pairs.append(leg)
+        installed = model_sizes.installed_pairs()
+        pairs = [leg for leg in model_pairs(src, dst) if leg not in installed]
 
         self.step("Creating a private Python environment", 3)
         if not os.path.exists(VPY):

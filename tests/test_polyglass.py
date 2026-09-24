@@ -4,12 +4,15 @@
 
 The translation tests use the installed offline models and are skipped when one is missing.
 """
+import json
 import os
 import sys
+import tempfile
 import unittest
 from types import SimpleNamespace
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+import model_sizes  # noqa: E402
 import polyglass  # noqa: E402
 import setup_wizard  # noqa: E402
 
@@ -119,6 +122,64 @@ class Setup(unittest.TestCase):
             reqs = f.read()
         self.assertNotIn("argostranslate", [l.split("=")[0].strip() for l in reqs.splitlines()])
         self.assertTrue(setup_wizard.ARGOS.startswith("argostranslate=="))
+
+
+
+class DownloadSizes(unittest.TestCase):
+    AVAILABLE = {("es", "en"), ("en", "es"), ("fr", "en"), ("en", "fr"), ("es", "pt"), ("en", "pt"),
+                 ("pt", "en"), ("de", "en"), ("en", "de")}
+    SIZES = {p: 100_000_000 for p in AVAILABLE}
+
+    def test_nothing_needed_when_installed(self):
+        self.assertEqual(model_sizes.needed("es", "en", self.AVAILABLE, {("es", "en")}), [])
+
+    def test_installed_route_through_english_counts(self):
+        self.assertEqual(model_sizes.needed("es", "fr", self.AVAILABLE, {("es", "en"), ("en", "fr")}), [])
+
+    def test_direct_model_preferred(self):
+        self.assertEqual(model_sizes.needed("es", "pt", self.AVAILABLE, set()), [("es", "pt")])
+
+    def test_only_missing_legs_through_english(self):
+        self.assertEqual(model_sizes.needed("fr", "es", self.AVAILABLE, {("en", "es")}), [("fr", "en")])
+
+    def test_no_route(self):
+        self.assertIsNone(model_sizes.needed("ja", "en", self.AVAILABLE, set()))
+
+    def test_total_and_label(self):
+        self.assertEqual(model_sizes.total([("es", "en"), ("en", "es")], self.SIZES), 200_000_000)
+        self.assertIsNone(model_sizes.total([("ja", "en")], self.SIZES))
+        self.assertEqual(model_sizes.label(240_400_000), "240 MB")
+        self.assertEqual(model_sizes.label(1_240_000_000), "1.2 GB")
+
+    def test_installed_pairs_reads_metadata(self):
+        with tempfile.TemporaryDirectory() as d:
+            for name, meta in [("a", {"from_code": "es", "to_code": "en"}),
+                               ("b", {"type": "sbd", "from_code": "es", "to_code": "es"})]:
+                os.makedirs(os.path.join(d, name))
+                with open(os.path.join(d, name, "metadata.json"), "w") as f:
+                    json.dump(meta, f)
+            self.assertEqual(model_sizes.installed_pairs(d), {("es", "en")})
+
+    def test_bar_size_covers_both_directions(self):
+        # Picking German with English as To downloads de -> en and en -> de.
+        me = SimpleNamespace(routes=Overlay.routes, model_index=dict.fromkeys(self.AVAILABLE, "url"),
+                             model_sizes={("de", "en"): 150_000_000, ("en", "de"): 150_000_000})
+        self.assertEqual(Overlay.download_size(me, ("de", "en"), {}), 300_000_000)
+        me.model_sizes = {}
+        self.assertIsNone(Overlay.download_size(me, ("de", "en"), {}))    # sizes not loaded yet
+
+    def test_setup_pairs(self):
+        self.assertEqual(setup_wizard.model_pairs("es", "en"), [("es", "en"), ("en", "es")])
+        self.assertEqual(setup_wizard.model_pairs("es", "fr"), [("es", "en"), ("en", "fr"), ("fr", "en"), ("en", "es")])
+        self.assertEqual(setup_wizard.model_pairs("auto", "en"), [])
+        self.assertEqual(setup_wizard.model_pairs("auto", "de"), [("en", "de")])
+
+    def test_live_sizes_from_the_model_server(self):
+        index = model_sizes.load_index()
+        if not index:
+            self.skipTest("offline")
+        sizes = model_sizes.fetch_sizes({("fr", "en"): index[("fr", "en")]}, {"fr", "en"})
+        self.assertGreater(sizes.get(("fr", "en"), 0), 10_000_000)
 
 
 class Translation(unittest.TestCase):

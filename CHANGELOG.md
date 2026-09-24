@@ -2,6 +2,11 @@
 
 Stable releases of Polyglass. Download the latest from the [Releases page](https://github.com/APierce-Ptak/polyglass/releases/latest).
 
+## 0.3.0 (2026-09-24)
+
+- **Download sizes are shown before downloading.** The language bar's dropdowns show each missing language's size (for example ⬇ 238 MB) instead of just "Download", and the download message includes it. Setup shows the size for the languages you pick, and skips models that are already installed.
+- Sizes come from the model server in about a second, in the background; offline, it falls back to "Download".
+
 ## 0.2.0 (2026-09-24)
 
 - **About 60% smaller install.** The app's packages dropped from 1.2 GB to about 450 MB: PyTorch, stanza and spaCy are no longer installed. Argos Translate is now only used to download models, which Polyglass runs through CTranslate2 directly.

@@ -77,6 +77,8 @@ from PIL import Image
 # CTranslate2 directly. (argostranslate.translate imports stanza, which needs PyTorch.)
 import argostranslate.package
 import ctranslate2
+
+import model_sizes
 from winsdk.windows.globalization import Language
 from winsdk.windows.graphics.imaging import (BitmapAlphaMode, BitmapPixelFormat,
                                              SoftwareBitmap)
@@ -330,7 +332,8 @@ class Translator:
 
     @staticmethod
     def installed(src, dst, models=None):
-        return Translator.route(src, dst, models or Translator.installed_models()) is not None
+        models = Translator.installed_models() if models is None else models
+        return Translator.route(src, dst, models) is not None
 
     @staticmethod
     def ready(src, dst, models):
@@ -342,14 +345,16 @@ class Translator:
                    for a in ({src, "zh"} if src == "zt" else {src})
                    for b in ({dst, "zh"} if dst == "zt" else {dst}))
 
-    def ensure(self, code, target):
+    def ensure(self, code, target, quiet=False):
         """Make sure an offline route code -> target exists, downloading models if needed.
-        Returns the source code to translate from (zt may fall back to zh), or None."""
+        Returns the source code to translate from (zt may fall back to zh), or None.
+        `quiet` skips the "Downloading" message (the language bar shows its own)."""
         if (code, target) in self.unavailable:
             return None
         if self.installed(code, target):
             return code
-        self.status(f"Downloading offline model {code} -> {target} (first time only)...")
+        if not quiet:
+            self.status(f"Downloading {name(code)} -> {name(target)} (first time only)...")
         try:
             argostranslate.package.update_package_index()
             pkgs = argostranslate.package.get_available_packages()
@@ -358,7 +363,7 @@ class Translator:
             # No direct model: go through English, e.g. ja -> en -> es.
             route = [direct] if direct else [find(code, "en"), find("en", target)]
             if any(p is None for p in route) and code == "zt":
-                return self.ensure("zh", target)
+                return self.ensure("zh", target, quiet)
             if any(p is None for p in route):     # not "None in route": Package.__eq__ breaks on None
                 self.unavailable.add((code, target))
                 self.status(f"No offline model for {name(code)} -> {name(target)}.")
@@ -442,6 +447,8 @@ class Overlay:
         self.exclude_from_capture = self._make_clickthrough()
 
         self.downloading = False
+        self.model_index, self.model_sizes = {}, {}     # filled in the background, for the menus
+        threading.Thread(target=self.load_model_sizes, daemon=True).start()
         self.start_hotkeys()
         self.build_bar()
         self.show_status(f"Ready: press Ctrl+Alt+T to translate into {name(self.target)}", 6000)
@@ -614,22 +621,44 @@ class Overlay:
             self.set_languages(*new)
             return
 
+        size = self.download_size(new, models)
+
         def download():
             self.downloading = self.working = True
             codes = dict.fromkeys(c for r in missing for c in r if c != "en")
-            self.jobs.put(("status", f"Downloading {' and '.join(map(name, codes)) or 'English'} "
-                                     "(first time only)..."))
+            what = " and ".join(map(name, codes)) or "English"
+            self.jobs.put(("status", f"Downloading {what}"
+                                     f"{f', {model_sizes.label(size)}' if size else ''} (first time only)..."))
             try:
-                if all(self.translator.ensure(a, b) for a, b in missing):
+                if all(self.translator.ensure(a, b, quiet=True) for a, b in missing):
                     self.jobs.put(("langs", new))
             finally:
                 self.downloading = self.working = False
 
         threading.Thread(target=download, daemon=True).start()
 
+    def load_model_sizes(self):
+        index = model_sizes.load_index()
+        self.model_sizes = model_sizes.fetch_sizes(index, set(LANG_ORDER)) if index else {}
+        self.model_index = index
+
+    def download_size(self, pair, models):
+        """Bytes to download before `pair` (from, to) works both ways, or None if unknown."""
+        installed, need = set(models), []
+        for r in self.routes(*pair):
+            if Translator.ready(*r, models):
+                continue
+            legs = model_sizes.needed(*r, self.model_index, installed)
+            if legs is None and r[0] == "zt":                  # like ensure(): fall back to zh
+                legs = model_sizes.needed("zh", r[1], self.model_index, installed)
+            if legs is None:
+                return None
+            need += [leg for leg in legs if leg not in need]
+        return model_sizes.total(need, self.model_sizes) if need else None
+
     def open_menu(self, side):
         """Dropdown for the From or To button: a check when a language is ready to use
-        offline, "Download" when its models still need downloading."""
+        offline, else the download size ("Download" while the sizes are unknown)."""
         if self.downloading:
             self.show_status("Still downloading, one moment...", 2000)
             return
@@ -643,9 +672,12 @@ class Overlay:
                               command=lambda: self.pick("from", "auto"))
             m.add_separator()
         for code in LANG_ORDER:
-            ok = all(Translator.ready(*r, models) for r in self.routes(*self.next_pair(side, code)))
+            pair = self.next_pair(side, code)
+            ok = all(Translator.ready(*r, models) for r in self.routes(*pair))
+            size = None if ok else self.download_size(pair, models)
+            mark = "✓" if ok else f"⬇ {model_sizes.label(size)}" if size else "⬇ Download"
             m.add_radiobutton(label=name(code), variable=self.menu_choice, value=code,
-                              accelerator="✓" if ok else "⬇ Download",
+                              accelerator=mark,
                               command=lambda c=code: self.pick(side, c))
         x0, _, _, y1 = self.bar_canvas.bbox(f"{side}_chip")
         m.tk_popup(self.bar.winfo_rootx() + x0, self.bar.winfo_rooty() + y1 + 4)

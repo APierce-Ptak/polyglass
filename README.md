@@ -17,7 +17,7 @@
 
 A transparent, click-through overlay for Windows that reads the text on your screen and draws the translation, in the language you choose, **in the same spot**, right over the original. It works on games, videos, apps, and web pages.
 
-- **Any language to any language.** Pick *From* and *To* in the bar at the top of the screen, like Google Translate, or leave *From* on *Detect language*. Installed languages show ✓; others show ⬇ Download and download when you pick them. The ⇄ button (or Ctrl+Alt+D) swaps them.
+- **Any language to any language.** Pick *From* and *To* in the bar at the top of the screen, like Google Translate, or leave *From* on *Detect language*. Installed languages show ✓; others show their download size (for example ⬇ 238 MB) and download when you pick them. The ⇄ button (or Ctrl+Alt+D) swaps them.
 - Supports Chinese, Japanese, Korean, Russian, Arabic, and Latin-script languages (Spanish, French, German, and others). Between two non-English languages (for example Japanese → Spanish), it translates through English.
 - **Private and fully local:** reading and translating both run on your PC, and nothing is uploaded. No accounts, API keys or subscriptions.
 - **Works on anything on your screen:** games, videos, PDFs, apps, web pages, remote desktops. No plugins or integrations.
@@ -32,7 +32,7 @@ A transparent, click-through overlay for Windows that reads the text on your scr
 2. Double-click **`Install.bat`**.
 3. Follow the setup wizard. Choose *Translate from* (or *Detect language*) and *Translate to*, with a ⇄ button to swap them. The wizard creates a private Python environment, installs the packages, adds Windows OCR language packs, downloads the offline translation models, and makes a desktop shortcut.
 
-Requirements: Windows 10 or 11, an internet connection for setup, and about 1 GB of free disk space (each extra language adds about 230 MB). If Python 3.10-3.12 is missing, `Install.bat` installs it with winget or sends you to the download page.
+Requirements: Windows 10 or 11, an internet connection for setup, and about 450 MB of free disk space plus your languages (usually 150-400 MB each; setup and the language bar show the exact size before downloading). If Python 3.10-3.12 is missing, `Install.bat` installs it with winget or sends you to the download page.
 
 ## Use
 
