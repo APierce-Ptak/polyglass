@@ -116,6 +116,7 @@ NAMES = {"en": "English", "zh": "Chinese", "zt": "Chinese (Traditional)", "ja": 
 FONTS = {"ja": "Yu Gothic UI", "zh": "Microsoft YaHei UI", "zt": "Microsoft JhengHei UI",
          "ko": "Malgun Gothic"}
 CONFIG_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "polyglass.json")
+CJK_CHARS = re.compile(r"[⺀-鿿　-ヿ가-힯＀-￯]")
 CJK_RE = re.compile(r"(?<=[⺀-鿿　-ヿ＀-￯]) +(?=[⺀-鿿　-ヿ＀-￯])")
 
 
@@ -723,8 +724,9 @@ class Overlay:
             action()
 
     def wrap(self, text, font, width):
-        # Chinese and Japanese have no spaces, so wrap those by character.
-        sep = " " if " " in text.strip() else ""
+        # Chinese and Japanese have no spaces, so wrap those by character. Other text wraps
+        # between words only; a word too long for the box is shrunk instead of split.
+        sep = " " if " " in text.strip() or not CJK_CHARS.search(text) else ""
         words = text.split() if sep else list(text.strip())
         lines, cur = [], ""
         for word in words:
@@ -751,7 +753,8 @@ class Overlay:
             for size in range(max(9, min(40, int(h * 0.85))), 8, -1):
                 font = tkfont.Font(family=font_family, size=-size)
                 lines = self.wrap(text, font, bw - 2 * pad)
-                if len(lines) * font.metrics("linespace") <= h + 2 * pad:
+                if (len(lines) * font.metrics("linespace") <= h + 2 * pad
+                        and max(map(font.measure, lines)) <= bw):
                     break
             bh = max(h + 2 * pad, len(lines) * font.metrics("linespace") + 2 * pad)
             self.canvas.create_rectangle(bx, by, bx + bw, by + bh, fill=bg, outline="", tags="tr")
