@@ -8,7 +8,7 @@
 
 <p align="center">
   <a href="https://apierce-ptak.github.io/polyglass/"><strong>Website</strong></a> ·
-  <a href="https://github.com/APierce-Ptak/polyglass/archive/refs/heads/main.zip"><strong>Download for Windows</strong></a>
+  <a href="https://github.com/APierce-Ptak/polyglass/releases/latest/download/Polyglass.zip"><strong>Download for Windows</strong></a>
 </p>
 
 <p align="center">
@@ -28,11 +28,11 @@ A transparent, click-through overlay for Windows that reads the text on your scr
 
 ## Install
 
-1. Download this repo (green **Code** button, then **Download ZIP**) and unzip it.
+1. Download **[Polyglass.zip](https://github.com/APierce-Ptak/polyglass/releases/latest/download/Polyglass.zip)** from the latest release and unzip it.
 2. Double-click **`Install.bat`**.
 3. Follow the setup wizard. Choose *Translate from* (or *Detect language*) and *Translate to*, with a ⇄ button to swap them. The wizard creates a private Python environment, installs the packages, adds Windows OCR language packs, downloads the offline translation models, and makes a desktop shortcut.
 
-Requirements: Windows 10 or 11, an internet connection for setup, and about 3 GB of free disk space. If Python 3.10-3.12 is missing, `Install.bat` installs it with winget or sends you to the download page.
+Requirements: Windows 10 or 11, an internet connection for setup, and about 1 GB of free disk space (each extra language adds about 230 MB). If Python 3.10-3.12 is missing, `Install.bat` installs it with winget or sends you to the download page.
 
 ## Use
 
@@ -75,6 +75,7 @@ Run `Debug.bat` to see a console with what the app is doing. It prints the insta
 ```
 py -3.12 -m venv .venv
 .venv\Scripts\python -m pip install -r requirements.txt
+.venv\Scripts\python -m pip install --no-deps argostranslate==1.11.0
 .venv\Scripts\python polyglass.py
 ```
 
@@ -82,13 +83,23 @@ py -3.12 -m venv .venv
 
 Double-click **`Uninstall.bat`**. It shows what it will remove and how much space that frees, then asks before removing anything:
 
-- the app's packages (`.venv` in the app folder, most of the ~3 GB)
+- the app's packages (`.venv` in the app folder, about 450 MB)
 - the translation models in `%USERPROFILE%\.local\share\argos-translate` and their download cache in `%USERPROFILE%\.local\cache\argos-translate`. These are outside the app folder, and are shared with other Argos Translate apps if you have any.
 - the desktop shortcut, your settings and the logs
 
 It also offers to remove the Windows text-recognition packs that `Install.bat` added (not ones you already had). This needs admin permission.
 
 When it's done, delete the app folder. If `Install.bat` installed Python 3.12 for you, you can remove it in **Settings → Apps** if nothing else uses it. Polyglass makes no other changes: no registry entries, startup items or services.
+
+## Development
+
+Run the tests from the app folder:
+
+```
+.venv\Scripts\python -m unittest -v
+```
+
+Releases are listed in [CHANGELOG.md](CHANGELOG.md).
 
 ## License
 

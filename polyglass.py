@@ -57,6 +57,7 @@ import time
 import tkinter as tk
 import tkinter.font as tkfont
 import unicodedata
+import zipfile
 from ctypes import wintypes
 
 if sys.platform != "win32":
@@ -72,11 +73,10 @@ import mss
 import numpy as np
 from PIL import Image
 
-# Run models in the precision they were saved in. Argos's default ("auto") picks int8 on
-# most CPUs, which turns the Spanish -> English model's output into "mainstremainstre...".
-os.environ.setdefault("ARGOS_COMPUTE_TYPE", "default")
+# Argos Translate is only used to download and install models; they run through
+# CTranslate2 directly. (argostranslate.translate imports stanza, which needs PyTorch.)
 import argostranslate.package
-import argostranslate.translate
+import ctranslate2
 from winsdk.windows.globalization import Language
 from winsdk.windows.graphics.imaging import (BitmapAlphaMode, BitmapPixelFormat,
                                              SoftwareBitmap)
@@ -297,29 +297,48 @@ def ocr_all(bgra, w, h, rgb=None, target="en", source="auto"):
 
 
 # ----------------------------------------------------------------- translation
+def install_model(path):
+    """Unpack a downloaded .argosmodel into Argos's models folder. (Argos's own
+    install_from_path does the same, then imports its translate module, which needs PyTorch.)"""
+    with zipfile.ZipFile(path) as z:
+        z.extractall(argostranslate.package.settings.package_data_dir)
+    os.remove(path)                    # the download isn't needed once it's unpacked
+
+
 class Translator:
     def __init__(self, status):
         self.status = status
         self.cache = {}
         self.unavailable = set()
+        self.engines = {}              # model folder -> loaded CTranslate2 model
 
     @staticmethod
-    def installed_languages():
-        return {l.code: l for l in argostranslate.translate.get_installed_languages()}
+    def installed_models():
+        """{(from_code, to_code): package} for every installed translation model."""
+        return {(p.from_code, p.to_code): p for p in argostranslate.package.get_installed_packages()
+                if p.type == "translate"}
 
     @staticmethod
-    def installed(src, dst, langs=None):
-        langs = langs or Translator.installed_languages()
-        # get_translation also finds a route through English (e.g. ja -> en -> es).
-        return src in langs and dst in langs and bool(langs[src].get_translation(langs[dst]))
+    def route(src, dst, models):
+        """The models that translate src -> dst: a direct one, or two through English
+        (e.g. ja -> en -> es). None when they aren't all installed."""
+        if (src, dst) in models:
+            return [models[(src, dst)]]
+        if (src, "en") in models and ("en", dst) in models:
+            return [models[(src, "en")], models[("en", dst)]]
+        return None
 
     @staticmethod
-    def ready(src, dst, langs):
+    def installed(src, dst, models=None):
+        return Translator.route(src, dst, models or Translator.installed_models()) is not None
+
+    @staticmethod
+    def ready(src, dst, models):
         """True when src -> dst can be translated offline right now (Traditional Chinese
         can fall back to the Simplified models, like ensure() does)."""
         if src == dst:
             return True
-        return any(Translator.installed(a, b, langs)
+        return any(Translator.installed(a, b, models)
                    for a in ({src, "zh"} if src == "zt" else {src})
                    for b in ({dst, "zh"} if dst == "zt" else {dst}))
 
@@ -346,11 +365,27 @@ class Translator:
                 return None
             for pkg in route:
                 if not self.installed(pkg.from_code, pkg.to_code):
-                    argostranslate.package.install_from_path(pkg.download())
+                    install_model(pkg.download())
             return code
         except Exception as e:
             self.status(f"Model download failed: {e}")
             return None
+
+    def run_model(self, pkg, text):
+        """Translate one line with one model, the way Argos Translate does it."""
+        path = str(pkg.package_path / "model")
+        if path not in self.engines:
+            # "default" keeps the precision the model was saved in; int8 (what "auto" picks
+            # on most CPUs) turns the Spanish -> English model's output into "mainstremainstre...".
+            self.engines[path] = ctranslate2.Translator(path, device="cpu", compute_type="default")
+        prefix = [[pkg.target_prefix]] if pkg.target_prefix else None
+        result = self.engines[path].translate_batch(
+            [pkg.tokenizer.encode(text)], target_prefix=prefix, replace_unknowns=True,
+            beam_size=4, length_penalty=0.2)
+        out = pkg.tokenizer.decode(result[0].hypotheses[0])
+        if pkg.target_prefix and out.startswith(pkg.target_prefix):
+            out = out[len(pkg.target_prefix):]
+        return out.strip()
 
     def translate(self, code, target, text):
         text = CJK_RE.sub("", text).strip()
@@ -359,8 +394,13 @@ class Translator:
         key = (code, target, text)
         if key not in self.cache:
             try:
-                self.cache[key] = argostranslate.translate.translate(text, code, target)
+                route = self.route(code, target, self.installed_models())
+                out = text
+                for pkg in route:
+                    out = self.run_model(pkg, out)
+                self.cache[key] = out
             except Exception:
+                traceback.print_exc()
                 self.cache[key] = text
         return self.cache[key]
 
@@ -568,8 +608,8 @@ class Overlay:
         new = self.next_pair(side, code)
         if new == (self.source, self.target):
             return
-        langs = Translator.installed_languages()
-        missing = [r for r in self.routes(*new) if not Translator.ready(*r, langs)]
+        models = Translator.installed_models()
+        missing = [r for r in self.routes(*new) if not Translator.ready(*r, models)]
         if not missing:
             self.set_languages(*new)
             return
@@ -593,7 +633,7 @@ class Overlay:
         if self.downloading:
             self.show_status("Still downloading, one moment...", 2000)
             return
-        langs = Translator.installed_languages()
+        models = Translator.installed_models()
         current = self.source if side == "from" else self.target
         m = tk.Menu(self.bar, tearoff=0, font=("Segoe UI", 10), bg="#1b1d23", fg="#f2f3f5",
                     activebackground="#2d3340", activeforeground="#ffffff", bd=0)
@@ -603,7 +643,7 @@ class Overlay:
                               command=lambda: self.pick("from", "auto"))
             m.add_separator()
         for code in LANG_ORDER:
-            ok = all(Translator.ready(*r, langs) for r in self.routes(*self.next_pair(side, code)))
+            ok = all(Translator.ready(*r, models) for r in self.routes(*self.next_pair(side, code)))
             m.add_radiobutton(label=name(code), variable=self.menu_choice, value=code,
                               accelerator="✓" if ok else "⬇ Download",
                               command=lambda c=code: self.pick(side, c))

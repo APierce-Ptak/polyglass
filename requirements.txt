@@ -2,6 +2,11 @@ mss
 pillow
 numpy
 winsdk
-argostranslate
 langdetect
 rapidocr-onnxruntime
+# Translation engine. argostranslate itself is installed separately with --no-deps
+# (see setup_wizard.py / README): its other dependencies pull in PyTorch.
+ctranslate2>=4,<5
+sentencepiece>=0.2,<0.3
+sacremoses>=0.0.53,<0.2
+packaging

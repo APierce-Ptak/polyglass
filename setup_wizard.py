@@ -25,6 +25,9 @@ CONFIG = os.path.join(APP_DIR, "polyglass.json")
 ICON = os.path.join(APP_DIR, "polyglass.ico")
 OCR_ADDED = os.path.join(APP_DIR, "ocr_added.txt")   # read by Uninstall.bat
 NO_WINDOW = 0x08000000
+# Installed without its dependencies: the app only uses Argos to download models (running them
+# through CTranslate2 itself), so it doesn't need stanza/spaCy/PyTorch, about 750 MB.
+ARGOS = "argostranslate==1.11.0"
 
 # (label, Windows OCR pack tag, Argos code). English OCR ships with Windows. Latin-script packs
 # are only added for a chosen From/To (they read that language's accents); English reads the rest.
@@ -68,6 +71,24 @@ def ocr_pack_command(tags):
     ps = ("Start-Process powershell -Verb RunAs -Wait -WindowStyle Hidden "
           f"-ArgumentList '-NoProfile','-ExecutionPolicy','Bypass','-File','\"{script}\"'")
     return ["powershell", "-NoProfile", "-Command", ps]
+
+
+
+def model_download_code(pairs):
+    """Python, run inside the app's environment, that downloads and installs the translation
+    models for `pairs` (e.g. [("es", "en")]). It unzips them itself: Argos's install_from_path
+    imports its translate module, which needs PyTorch. The downloads are deleted once unpacked."""
+    return (
+        "import os, zipfile, argostranslate.package as p\n"
+        "p.update_package_index(); av=p.get_available_packages()\n"
+        f"for a,b in {pairs!r}:\n"
+        "    pk=next((x for x in av if x.from_code==a and x.to_code==b),None)\n"
+        "    if not pk: print('no model for',a,'->',b); continue\n"
+        "    print('downloading',a,'->',b)\n"
+        "    f=pk.download()\n"
+        "    with zipfile.ZipFile(f) as z: z.extractall(p.settings.package_data_dir)\n"
+        "    os.remove(f)\n"
+        "    print('installed',a,'->',b)\n")
 
 
 BG, FG, ACCENT, MUTED = "#15171c", "#f2f3f5", "#4fc3f7", "#8b93a7"
@@ -160,7 +181,7 @@ class Wizard(tk.Tk):
             "  •  Download the offline translation models\n"
             "  •  Create a desktop shortcut\n\n"
             "Everything runs on your PC. Nothing is sent to the cloud.\n"
-            "It takes a few minutes and needs about 3 GB of disk space and an internet connection.")).pack(anchor="w")
+            "It takes a few minutes and needs about 1 GB of disk space and an internet connection.")).pack(anchor="w")
         self.back_btn.state(["disabled"])
         self.next_btn.config(text="Next")
 
@@ -340,6 +361,8 @@ class Wizard(tk.Tk):
         self.step("Installing packages (this is the slow part)", 8)
         self.run([VPY, "-m", "pip", "install", "--upgrade", "pip"])
         code = self.run([VPY, "-m", "pip", "install", "-r", os.path.join(APP_DIR, "requirements.txt")])
+        if code == 0:
+            code = self.run([VPY, "-m", "pip", "install", "--no-deps", ARGOS])
         if code != 0:
             self.ok = False
             self.say("Package install failed. Check your internet connection and try again.")
@@ -356,14 +379,7 @@ class Wizard(tk.Tk):
 
         self.step("Downloading offline translation models", 70)
         if pairs:
-            snippet = (
-                "import argostranslate.package as p\n"
-                "p.update_package_index(); av=p.get_available_packages()\n"
-                f"for a,b in {pairs!r}:\n"
-                "    pk=next((x for x in av if x.from_code==a and x.to_code==b),None)\n"
-                "    if not pk: print('no model for',a,'->',b); continue\n"
-                "    print('downloading',a,'->',b); p.install_from_path(pk.download()); print('installed',a,'->',b)\n")
-            if self.run([VPY, "-c", snippet]) != 0:
+            if self.run([VPY, "-c", model_download_code(pairs)]) != 0:
                 self.say("Some models did not download; they will download on first use instead.")
 
         if self.shortcut.get():
