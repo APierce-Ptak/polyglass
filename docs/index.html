@@ -15,33 +15,36 @@
 <meta property="og:image:alt" content="Polyglass: Any Language. Any Place. Japanese, Spanish and Chinese lines translated into English.">
 <meta name="twitter:card" content="summary_large_image">
 <link rel="icon" type="image/png" href="favicon.png">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;800;900&display=swap" rel="stylesheet">
 <style>
+  /* Colours come from the logo: glass teal, ink, and the parrot's red, yellow and blue. */
   :root {
-    --bg: #fbfbfd;
+    --bg: #f4f8f9;
     --surface: #ffffff;
-    --text: #15171c;
-    --muted: #5d6270;
-    --border: #e3e5ec;
-    --accent: #3d68f0;
+    --text: #16323a;
+    --muted: #5b7479;
+    --border: #d5e2e5;
+    --accent: #1c7f8d;
     --accent-text: #ffffff;
-    --code-bg: #f1f3f8;
-    --screen: #1b1e27;
-    --screen-text: #e9ebf2;
-    --overlay-bg: #262a36;
+    --code-bg: #e8f1f3;
+    --teal: #2ca7b8;
+    --glass: #c6ecf5;
+    --red: #e5392f;
+    --yellow: #ffcd2e;
+    --blue: #2272d6;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --bg: #0f1116;
-      --surface: #171a21;
-      --text: #eceef4;
-      --muted: #a0a6b5;
-      --border: #2a2f3a;
-      --accent: #6b8dff;
-      --accent-text: #0b0d12;
-      --code-bg: #1f232d;
-      --screen: #0a0c11;
-      --screen-text: #e9ebf2;
-      --overlay-bg: #161923;
+      --bg: #0f2329;
+      --surface: #16323a;
+      --text: #eef6f7;
+      --muted: #9fb7bb;
+      --border: #28505a;
+      --accent: #5cc8d6;
+      --accent-text: #0f2329;
+      --code-bg: #1b3a42;
     }
   }
   * { box-sizing: border-box; }
@@ -49,124 +52,98 @@
     margin: 0;
     background: var(--bg);
     color: var(--text);
-    font: 16px/1.6 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    font: 17px/1.6 "Nunito", "Segoe UI", system-ui, sans-serif;
   }
-  a { color: var(--accent); }
+  a { color: var(--accent); font-weight: 700; }
   .wrap { max-width: 960px; margin: 0 auto; padding: 0 16px; }
 
   header { padding: 20px 0; }
   header .wrap { display: flex; justify-content: space-between; align-items: center; }
-  .logo { display: flex; align-items: center; gap: 8px; font-weight: 700; font-size: 18px; color: var(--text); text-decoration: none; }
-  .logo img { width: 32px; height: 32px; }
-  .hero-logo { width: 132px; height: 132px; display: block; margin: 0 auto 12px; }
-  header nav a { color: var(--muted); text-decoration: none; margin-left: 20px; font-size: 15px; }
+  .logo { display: flex; align-items: center; gap: 8px; font-weight: 900; font-size: 20px; color: var(--text); text-decoration: none; }
+  .logo img { width: 34px; height: 34px; }
+  header nav a { color: var(--muted); text-decoration: none; margin-left: 22px; font-size: 16px; font-weight: 700; }
   header nav a:hover { color: var(--text); }
 
-  .hero { padding-top: 56px; padding-bottom: 40px; text-align: center; }
-  .hero h1 { font-size: clamp(34px, 6vw, 56px); line-height: 1.1; margin: 0 0 16px; letter-spacing: -0.02em; }
-  .hero p { font-size: 19px; color: var(--muted); max-width: 620px; margin: 0 auto 28px; }
+  .hero { padding-top: 40px; padding-bottom: 24px; text-align: center; }
+  .hero-logo { width: 140px; height: 140px; display: block; margin: 0 auto 8px; }
+  .hero h1 { font-size: clamp(38px, 7vw, 66px); font-weight: 900; line-height: 1.05; margin: 0 0 16px; letter-spacing: -0.01em; }
+  .hero h1 em { font-style: normal; color: var(--accent); }
+  .hero p { font-size: 19px; color: var(--muted); max-width: 640px; margin: 0 auto 28px; }
   .buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
   .btn {
-    display: inline-block; padding: 12px 22px; border-radius: 10px;
-    font-weight: 600; text-decoration: none; border: 1px solid var(--border);
+    display: inline-block; padding: 13px 24px; border-radius: 12px;
+    font-weight: 800; text-decoration: none; border: 2px solid var(--text);
     color: var(--text); background: var(--surface);
   }
   .btn.primary { background: var(--accent); color: var(--accent-text); border-color: var(--accent); }
-  .small { font-size: 14px; color: var(--muted); margin-top: 14px; }
+  .btn:hover { transform: translateY(-1px); }
+  .small { font-size: 15px; color: var(--muted); margin-top: 16px; font-weight: 600; }
 
-  /* Examples carousel: animated text scenes and a real recording, all the same size */
-  .carousel { max-width: 600px; margin: 32px auto 0; text-align: left; }
-  .stage {
-    position: relative; aspect-ratio: 820 / 674; border-radius: 14px; overflow: hidden;
-    background: var(--screen); color: var(--screen-text);
-    border: 1px solid var(--border); box-shadow: 0 20px 50px rgba(0,0,0,.18);
-  }
-  .slide { position: absolute; inset: 0; opacity: 0; transition: opacity .5s; display: flex; flex-direction: column; }
-  .slide.active { opacity: 1; }
-  .slide img { width: 100%; height: 100%; display: block; object-fit: contain; background: #f4f6fa; }
-  .slide .bar {
-    display: flex; align-items: center; gap: 10px;
-    padding: 10px 16px; font-size: 14px; background: rgba(255,255,255,.06);
-  }
-  .dot { width: 9px; height: 9px; border-radius: 50%; background: #3ecf8e; }
-  .slide .lines { flex: 1; padding: 0 28px; display: flex; flex-direction: column; justify-content: center; gap: 22px; }
-  .line { position: relative; font-size: 24px; min-height: 1.5em; }
-  .line .src, .line .dst { transition: opacity .5s; }
-  .line .dst {
-    position: absolute; inset: 0; opacity: 0;
-    background: var(--overlay-bg); padding: 0 4px; margin: 0 -4px;
-  }
-  .slide.on .line .src { opacity: 0; }
-  .slide.on .line .dst { opacity: 1; }
-  .carousel-nav { display: flex; align-items: center; justify-content: center; gap: 14px; margin-top: 14px; }
-  .carousel-nav .arrow {
-    width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--border);
-    background: var(--surface); color: inherit; font-size: 20px; line-height: 1; cursor: pointer;
-  }
-  .dots { display: flex; gap: 6px; }
-  .dots button {
-    width: 24px; height: 24px; padding: 0; border: 0; background: none; cursor: pointer;
-    display: grid; place-items: center;
-  }
-  .dots button::before {
-    content: ""; width: 10px; height: 10px; border-radius: 50%; background: var(--border);
-  }
-  .dots button[aria-current="true"]::before { background: #3ecf8e; }
-  .caption { text-align: center; font-size: 14px; color: var(--muted); margin: 8px 0 0; min-height: 2.8em; }
-  @media (prefers-reduced-motion: reduce) {
-    .slide, .line .src, .line .dst { transition: none; }
+  /* The promo film: three screens translated by a sliding pane, which becomes the logo */
+  /* In light mode the film's background is the page's, so it sits on the page unframed. */
+  .film { margin: 8px auto 0; max-width: 960px; }
+  .film video { display: block; width: 100%; height: auto; aspect-ratio: 1920 / 720; background: #f4f8f9; }
+  @media (prefers-color-scheme: dark) {
+    .film { margin-top: 36px; }
+    .film video { border-radius: 20px; }
   }
 
   /* Dictionary entry for the name */
   .entry {
-    max-width: 600px; margin: 0 auto; padding: 26px 28px; text-align: left;
-    background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
+    max-width: 620px; margin: 0 auto; padding: 26px 28px; text-align: left;
+    background: var(--surface); border: 2px solid var(--border); border-radius: 16px;
     font-family: Georgia, "Times New Roman", serif;
   }
   .entry .head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px 12px; margin: 0 0 14px; }
   .entry .word { font-size: 32px; font-weight: 700; letter-spacing: .01em; }
   .entry .ipa { font-size: 17px; color: var(--muted); }
   .entry .pos { font-size: 16px; font-style: italic; color: var(--muted); }
-  .entry h3 { font: 600 12px/1 system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
-              color: var(--muted); margin: 18px 0 8px; }
+  .entry h3 { font: 800 12px/1 "Nunito", system-ui, sans-serif; letter-spacing: .08em; text-transform: uppercase;
+              color: var(--accent); margin: 18px 0 8px; }
   .entry p, .entry li { font-size: 16.5px; line-height: 1.55; margin: 0; }
   .entry ul { margin: 0; padding-left: 20px; }
   .entry ul li { margin-bottom: 6px; }
   .entry ol { margin: 0; padding-left: 22px; }
   .entry ol li { margin-bottom: 6px; }
   .entry .aside { color: var(--muted); font-size: 14.5px; margin-top: 4px; }
-  .entry .usage { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--border); font-style: italic; color: var(--muted); }
-  #name { padding-top: 8px; }
+  .entry .usage { margin-top: 18px; padding-top: 14px; border-top: 2px solid var(--border); font-style: italic; color: var(--muted); }
+  #name { padding-top: 24px; }
 
   .shot { margin: 0 0 24px; }
-  .shot img { display: block; width: 100%; height: auto; border-radius: 12px; border: 1px solid var(--border); }
-  .shot figcaption { margin-top: 8px; font-size: 14px; color: var(--muted); }
+  .shot img { display: block; width: 100%; height: auto; border-radius: 16px; border: 2px solid var(--border); }
+  .shot figcaption { margin-top: 10px; font-size: 15px; color: var(--muted); font-weight: 600; }
+  .recording { max-width: 620px; }
 
-  section { padding: 48px 0; }
-  h2 { font-size: 28px; margin: 0 0 20px; letter-spacing: -0.01em; }
+  section { padding: 52px 0; }
+  h2 { font-size: 34px; font-weight: 900; margin: 0 0 22px; letter-spacing: -0.01em; }
   .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
-  .card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 20px; }
-  .card h3 { margin: 0 0 6px; font-size: 17px; }
-  .card p { margin: 0; color: var(--muted); font-size: 15px; }
+  .card { background: var(--surface); border: 2px solid var(--border); border-radius: 16px; padding: 20px 22px; }
+  .card h3 { margin: 0 0 6px; font-size: 18px; font-weight: 800; }
+  .card h3::before { content: ""; display: inline-block; width: 12px; height: 12px; border-radius: 3px; margin-right: 10px; vertical-align: 1px; background: var(--teal); }
+  .card:nth-child(4n+1) h3::before { background: var(--red); }
+  .card:nth-child(4n+2) h3::before { background: var(--blue); }
+  .card:nth-child(4n+3) h3::before { background: var(--yellow); }
+  .card p { margin: 0; color: var(--muted); font-size: 16px; }
 
   ol.steps { padding-left: 22px; margin: 0; }
   ol.steps li { margin-bottom: 10px; }
-  table { border-collapse: collapse; width: 100%; max-width: 620px; }
-  td { padding: 10px 12px 10px 0; border-bottom: 1px solid var(--border); vertical-align: top; }
+  ol.steps li::marker { font-weight: 900; color: var(--accent); }
+  table { border-collapse: collapse; width: 100%; max-width: 640px; }
+  td { padding: 10px 12px 10px 0; border-bottom: 2px solid var(--border); vertical-align: top; }
   kbd {
-    font: 13px ui-monospace, Consolas, monospace; background: var(--code-bg);
-    border: 1px solid var(--border); border-radius: 6px; padding: 2px 7px; white-space: nowrap;
+    font: 700 13px ui-monospace, Consolas, monospace; background: var(--surface);
+    border: 2px solid var(--border); border-bottom-width: 4px; border-radius: 8px; padding: 2px 8px; white-space: nowrap;
   }
-  .note { color: var(--muted); font-size: 15px; }
+  .note { color: var(--muted); font-size: 16px; }
 
-  footer { padding: 32px 0 48px; color: var(--muted); font-size: 14px; border-top: 1px solid var(--border); }
+  footer { padding: 32px 0 48px; color: var(--muted); font-size: 15px; border-top: 2px solid var(--border); font-weight: 600; }
   footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 8px; }
 
   @media (max-width: 520px) {
     header nav a:not(:last-child) { display: none; }
-    .hero { padding-top: 32px; }
-    .line { font-size: 17px; }
-    .slide .lines { padding: 0 16px; gap: 14px; }
+    .hero { padding-top: 24px; }
+    .film { max-width: 420px; }
+    .film video { border-radius: 12px; aspect-ratio: 1080 / 2232; }
   }
 </style>
 </head>
@@ -186,7 +163,7 @@
 <main>
   <div class="wrap hero">
     <img class="hero-logo" src="logo.png" alt="Polyglass logo: a parrot perched on a pane of glass">
-    <h1>Any Language. Any Place.</h1>
+    <h1>Any Language. <em>Any Place.</em></h1>
     <p>Polyglass is a transparent overlay for Windows that reads the text on your screen and draws the translation, in the language you choose, right over it. Spanish, Japanese, English and more. It works on anything on your screen, and everything stays on your PC.</p>
     <div class="buttons">
       <a class="btn primary" href="https://github.com/APierce-Ptak/polyglass/releases/latest/download/Polyglass.zip">Download for Windows</a>
@@ -194,15 +171,13 @@
     </div>
     <div class="small">Windows 10 or 11 · 100% local and private · No accounts or API keys · Free and open source (MIT)</div>
 
-    <div class="carousel" id="carousel" role="region" aria-roledescription="carousel" aria-label="Examples">
-      <div class="stage" id="stage"></div>
-      <div class="carousel-nav">
-        <button class="arrow" id="prev" aria-label="Previous example">&#8249;</button>
-        <div class="dots" id="dots"></div>
-        <button class="arrow" id="next" aria-label="Next example">&#8250;</button>
-      </div>
-      <p class="caption" id="caption" aria-live="polite"></p>
-    </div>
+    <figure class="film">
+      <video id="film" autoplay muted loop playsinline preload="auto" width="1920" height="720"
+             poster="promo-wide.jpg"
+             aria-label="Animation: a Japanese game, a Spanish video and a Chinese PDF are each translated into English in place by a sliding pane of glass, then the three screens merge into the Polyglass logo.">
+        <source src="promo-wide.mp4" type="video/mp4">
+      </video>
+    </figure>
   </div>
 
   <section id="name" aria-label="What the name means">
@@ -244,6 +219,17 @@
         <div class="card"><h3>Live mode</h3><p>Re-translates only when the text on screen actually changes, so it stays light on CPU.</p></div>
         <div class="card"><h3>Click-through</h3><p>The overlay never gets in the way. Keep playing or working normally.</p></div>
       </div>
+    </div>
+  </section>
+
+  <section id="recording">
+    <div class="wrap">
+      <h2>A real recording</h2>
+      <figure class="shot recording">
+        <img src="demo.gif" width="820" height="674" loading="lazy"
+             alt="Recording: a Chinese quarterly financial report on screen is replaced, line by line in place, with its English translation">
+        <figcaption>Polyglass translating a Chinese financial report into English, captured from the screen.</figcaption>
+      </figure>
     </div>
   </section>
 
@@ -306,94 +292,19 @@
 </footer>
 
 <script>
-  // Examples carousel: two animated scenes (original, then its translation) and a real recording.
-  const slides = [
-    { from: 'JA', to: 'EN', caption: 'Game text · Japanese → English', lines: [
-      ['冒険を始めますか？', 'Do you want to start the adventure?'],
-      ['新しいアイテムを手に入れた！', 'You got a new item!'],
-      ['設定 · セーブ · 終了', 'Settings · Save · Quit'] ] },
-    { clip: 'demo.gif', ms: 7000, caption: 'Real recording · Chinese financial report → English',
-      alt: 'Recording: a Chinese quarterly financial report on screen is replaced, line by line in place, with its English translation' },
-    { from: 'EN', to: 'ES', caption: 'Web page · English → Spanish', lines: [
-      ['Welcome back, traveler', 'Bienvenido de nuevo, viajero'],
-      ['Your order has shipped', 'Tu pedido ha sido enviado'],
-      ['Settings · Save · Quit', 'Ajustes · Guardar · Salir'] ] },
-  ];
-  const stage = document.getElementById('stage');
-  const dots = document.getElementById('dots');
-  const caption = document.getElementById('caption');
-  const reduce = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-  const els = slides.map((s, i) => {
-    const el = document.createElement('div');
-    el.className = 'slide';
-    el.setAttribute('aria-hidden', 'true');
-    if (s.clip) {
-      const img = document.createElement('img');
-      img.alt = s.alt; img.width = 820; img.height = 674; img.src = s.clip;
-      el.append(img);
-    } else {
-      const bar = document.createElement('div'); bar.className = 'bar';
-      const dot = document.createElement('span'); dot.className = 'dot';
-      const st = document.createElement('span'); st.className = 'status';
-      bar.append(dot, st);
-      const box = document.createElement('div'); box.className = 'lines';
-      for (const [src, dst] of s.lines) {
-        const line = document.createElement('div'); line.className = 'line';
-        const a = document.createElement('span'); a.className = 'src'; a.textContent = src;
-        const b = document.createElement('span'); b.className = 'dst'; b.textContent = dst;
-        line.append(a, b); box.append(line);
-      }
-      el.append(bar, box);
-    }
-    stage.append(el);
-    const d = document.createElement('button');
-    d.setAttribute('aria-label', 'Example ' + (i + 1) + ': ' + s.caption);
-    d.addEventListener('click', () => show(i));
-    dots.append(d);
-    return el;
-  });
-  let cur = 0, timers = [], paused = false;
-  function clear() { timers.forEach(clearTimeout); timers = []; }
-  function status(i, on) {
-    const s = slides[i], st = els[i].querySelector('.status');
-    if (st) st.textContent = 'Polyglass · live · ' + s.from + ' → ' + s.to + (on ? ' · translated 3 lines' : '');
+  // Phones get the stacked cut of the film, so the screens stay readable.
+  const film = document.getElementById('film');
+  if (window.matchMedia('(max-width: 520px)').matches) {
+    film.poster = 'promo-tall.jpg';
+    film.querySelector('source').src = 'promo-tall.mp4';
+    film.load();
   }
-  function show(i) {
-    clear();
-    cur = (i + slides.length) % slides.length;
-    els.forEach((el, j) => {
-      el.classList.toggle('active', j === cur);
-      el.setAttribute('aria-hidden', j === cur ? 'false' : 'true');
-      el.classList.remove('on');
-    });
-    [...dots.children].forEach((d, j) => d.setAttribute('aria-current', j === cur ? 'true' : 'false'));
-    const s = slides[cur];
-    caption.textContent = s.caption;
-    let hold;
-    if (s.clip) {
-      els[cur].querySelector('img').src = s.clip + '?t=' + Date.now();   // restart the GIF
-      hold = s.ms;
-    } else {
-      status(cur, false);
-      timers.push(setTimeout(() => { els[cur].classList.add('on'); status(cur, true); }, reduce ? 0 : 1400));
-      hold = 4800;
-    }
-    if (!paused && !reduce) timers.push(setTimeout(() => show(cur + 1), hold));
+  // People who ask for less motion get the still frame and a play button instead.
+  if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    film.removeAttribute('autoplay');
+    film.pause();
+    film.controls = true;
   }
-  document.getElementById('prev').addEventListener('click', () => show(cur - 1));
-  document.getElementById('next').addEventListener('click', () => show(cur + 1));
-  const car = document.getElementById('carousel');
-  car.addEventListener('mouseenter', () => { paused = true; });
-  car.addEventListener('mouseleave', () => { paused = false; show(cur); });
-  // Swipe on phones
-  let x0 = null;
-  stage.addEventListener('touchstart', e => { x0 = e.touches[0].clientX; }, { passive: true });
-  stage.addEventListener('touchend', e => {
-    if (x0 === null) return;
-    const dx = e.changedTouches[0].clientX - x0; x0 = null;
-    if (Math.abs(dx) > 40) show(cur + (dx < 0 ? 1 : -1));
-  });
-  show(0);
 </script>
 </body>
 </html>
