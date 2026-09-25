@@ -50,7 +50,7 @@ Start **Polyglass** from the desktop shortcut (or `Run.bat`), click the window w
 | Ctrl+Alt+L | Turn live mode on or off |
 | Ctrl+Alt+D | Swap the From and To languages |
 | Ctrl+Alt+C | Clear the overlay |
-| Ctrl+Alt+Q | Quit |
+| Ctrl+Alt+Q | Quit (or right-click Polyglass on the taskbar and choose Close window) |
 
 Click the languages in the bar to change them. With a *From* language picked, the screen is read as that language; with *Detect language*, it works out the language itself and leaves text that is already in the output language alone.
 

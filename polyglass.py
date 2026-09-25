@@ -442,6 +442,14 @@ class Overlay:
                else next((m for m in screens if m.get("is_primary")), screens[0]))
         self.mon = mon
         r = self.root
+        # Its own taskbar button, named and with the parrot, not grouped with other Python programs.
+        ctypes.windll.shell32.SetCurrentProcessExplicitAppUserModelID("Polyglass.Overlay")
+        r.title("Polyglass")
+        try:
+            r.iconbitmap(default=os.path.join(os.path.dirname(os.path.abspath(__file__)), "polyglass.ico"))
+        except tk.TclError:
+            pass
+        r.protocol("WM_DELETE_WINDOW", r.destroy)       # taskbar button > Close window
         r.overrideredirect(True)
         r.attributes("-topmost", True)
         r.attributes("-transparentcolor", TRANSPARENT)
@@ -489,8 +497,12 @@ class Overlay:
         hwnd = u.GetParent(self.root.winfo_id()) or self.root.winfo_id()
         GWL_EXSTYLE = -20
         style = u.GetWindowLongW(hwnd, GWL_EXSTYLE)
-        style |= 0x00080000 | 0x00000020 | 0x00000080 | 0x08000000  # LAYERED|TRANSPARENT|TOOLWINDOW|NOACTIVATE
+        # APPWINDOW gives Polyglass a taskbar button, like any program (TOOLWINDOW would hide it).
+        style = (style | 0x00080000 | 0x00000020 | 0x08000000 | 0x00040000) & ~0x00000080
+        #                LAYERED      TRANSPARENT  NOACTIVATE   APPWINDOW       not TOOLWINDOW
+        u.ShowWindow(hwnd, 0)                      # the taskbar only notices while it's hidden
         u.SetWindowLongW(hwnd, GWL_EXSTYLE, style)
+        u.ShowWindow(hwnd, 4)                      # SW_SHOWNOACTIVATE
         # Tell Windows explicitly: colour #010101 is see-through, everything else fully opaque.
         u.SetLayeredWindowAttributes(hwnd, 0x010101, 255, 0x1)  # LWA_COLORKEY
         # Re-assert always-on-top without stealing focus.
